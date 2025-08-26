@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "sourceMap": true,
     "target": "esnext",
     "lib": ["ES2024"],
@@ -15,12 +15,9 @@
     "paths": {
       "src/*": [
         "./src/*"
-      ],
-      "proto_dist/*": [
-        "./proto_dist/*"
       ]
     }
   },
-  "include": ["src/**/*", "proto_dist/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

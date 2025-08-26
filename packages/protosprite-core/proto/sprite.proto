@@ -21,7 +21,7 @@ message Frame {
     BBox sprite_bbox = 3;
   }
 
-  FrameLayer layer = 2;
+  repeated FrameLayer layers = 2;
   float duration = 3;
 };
 
@@ -29,13 +29,15 @@ message Frame {
 message Layer {
   string name = 1;
   string parent_layer_name = 2;
-  string opacity = 3;
+  float opacity = 3;
+  bool opacity_set = 4;
 };
 
 // Sprites can have any number of overlapping animations.
 message Animation {
-  int32 index_start = 1;
-  int32 index_end = 2;
+  string name = 1;
+  int32 index_start = 2;
+  int32 index_end = 3;
 };
 
 // Sprites can embed their sprite sheets.
@@ -52,8 +54,8 @@ message EmbeddedSpriteSheet {
 // Sprites can reference external sprite sheets.
 message ExternalSpriteSheet {
   oneof source {
-    string url = 1;
-    string file_name = 2;
+    string url = 2;
+    string file_name = 3;
   }
 };
 
@@ -62,11 +64,21 @@ message Sprite {
   string name = 1;
 
   oneof pixel_source {
+    bool embedded_in_parent_sheet = 2;
+    EmbeddedSpriteSheet embedded_sheet = 3;
+    ExternalSpriteSheet external_sheet = 4;
+  }
+
+  repeated Frame frames = 5;
+  repeated Layer layers = 6;
+  repeated Animation animations = 7;
+};
+
+// Sprite sheet message.
+message SpriteSheet {
+  repeated Sprite sprites = 1;
+  oneof pixel_source {
     EmbeddedSpriteSheet embedded_sheet = 2;
     ExternalSpriteSheet external_sheet = 3;
   }
-
-  repeated Frame frames = 4;
-  repeated Layer layers = 5;
-  repeated Animation animations = 6;
-};
+}

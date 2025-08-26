@@ -3,7 +3,23 @@
   "type": "module",
   "version": "0.0.1",
   "description": "A compact, protobuf based sprite exchange format",
-  "main": "index.js",
+  "main": "dist/core.js",
+  "types": "dist/src/core/index.d.ts",
+  "exports": {
+    ".": {
+      "default": "./dist/core.js",
+      "types": "./dist/src/core/index.d.ts"
+    },
+    "./importers/aseprite": {
+      "default": "./dist/importers/aseprite.js",
+      "types": "./dist/src/importers/aseprite.d.ts"
+    },
+    "./transform": {
+      "default": "./dist/transform.js",
+      "types": "./dist/src/transform/index.d.ts"
+    }
+  },
+  "sideEffects": false,
   "keywords": [
     "protobuf",
     "sprites",
@@ -17,9 +33,6 @@
     "build:rollup": "rollup -c",
     "build": "npm run build:clean && npm run build:buf && npm run build:rollup",
     "postinstall": "npm run build"
-  },
-  "bin": {
-    "encode": "./bin/encode.js"
   },
   "devDependencies": {
     "@bufbuild/buf": "^1.56.0",
@@ -41,6 +54,11 @@
     "proto_dist"
   ],
   "dependencies": {
+    "events": "^3.3.0",
     "js-base64": "^3.7.8"
+  },
+  "optionalDependencies": {
+    "@kayahr/aseprite": "^2.0.0",
+    "bin-pack": "^1.0.2"
   }
 }
