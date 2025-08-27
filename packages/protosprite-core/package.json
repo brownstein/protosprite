@@ -34,15 +34,6 @@
     "build": "npm run build:clean && npm run build:buf && npm run build:rollup",
     "postinstall": "npm run build"
   },
-  "devDependencies": {
-    "@bufbuild/buf": "^1.56.0",
-    "@bufbuild/protobuf": "^2.7.0",
-    "@bufbuild/protoc-gen-es": "^2.7.0",
-    "@rollup/plugin-typescript": "^12.1.4",
-    "jest": "^29.7.0",
-    "rollup": "^4.48.1",
-    "typescript": "^5.9.2"
-  },
   "directories": {
     "src": "src",
     "dist": "dist",
@@ -57,8 +48,21 @@
     "events": "^3.3.0",
     "js-base64": "^3.7.8"
   },
+  "devDependencies": {
+    "@bufbuild/buf": "^1.56.0",
+    "@bufbuild/protobuf": "^2.7.0",
+    "@bufbuild/protoc-gen-es": "^2.7.0",
+    "@kayahr/aseprite": "^2.0.0",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "bin-pack": "^1.0.2",
+    "jest": "^29.7.0",
+    "jimp": "^1.6.0",
+    "rollup": "^4.48.1",
+    "typescript": "^5.9.2"
+  },
   "optionalDependencies": {
     "@kayahr/aseprite": "^2.0.0",
-    "bin-pack": "^1.0.2"
+    "bin-pack": "^1.0.2",
+    "jimp": "^1.6.0"
   }
 }

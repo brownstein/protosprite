@@ -10,6 +10,12 @@ message BBox {
   int32 height = 4;
 };
 
+// 2D coordinates without sizing.
+message Position {
+  int32 x = 1;
+  int32 y = 2;
+};
+
 // This message represents one frame of the sprite.
 message Frame {
   int32 frame_index = 1;
@@ -72,6 +78,7 @@ message Sprite {
   repeated Frame frames = 5;
   repeated Layer layers = 6;
   repeated Animation animations = 7;
+  Position center = 8;
 };
 
 // Sprite sheet message.

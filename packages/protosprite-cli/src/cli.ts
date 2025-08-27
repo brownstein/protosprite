@@ -1,5 +1,4 @@
 import * as aseprite from "@kayahr/aseprite";
-import { Image, createCanvas, loadImage } from "canvas";
 import childProcess from "child_process";
 import { Command } from "commander";
 import { EventEmitter } from "events";
@@ -13,7 +12,8 @@ import {
   ProtoSpriteSheet
 } from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
-import { repackSpriteSheet } from "protosprite-core/transform";
+import { findAsperiteBinary } from "./util/findAseprite.js";
+import { packSpriteSheet, renderSpriteInstance } from "protosprite-core/transform";
 
 const program = new Command();
 program
@@ -28,28 +28,10 @@ program
     exportSpriteSheet(inputStr);
   });
 
-program.command("render").action(() => renderSprite());
-
-program.command("rerender").action(() => rerender());
+program.command("render").action(renderSprite);
+program.command("pack").action(pack);
 
 program.parse();
-
-// FIXME.
-function findAsperiteBinary() {
-  return path.join(
-    "~",
-    "Library",
-    "Application\\ Support",
-    "Steam",
-    "steamapps",
-    "common",
-    "Aseprite",
-    "Aseprite.app",
-    "Contents",
-    "MacOS",
-    "aseprite"
-  );
-}
 
 function exportSpriteSheet(targetFile: string) {
   const asepriteBinPath = findAsperiteBinary();
@@ -77,62 +59,34 @@ async function renderSprite() {
   const sheetData = JSON.parse(
     fs.readFileSync("./work/exported-data.json", { encoding: "utf8" })
   ) as aseprite.SpriteSheet;
-  const sheetImage = await loadImage("./work/exported-sheet.png");
+  
+  const sprite = importAsepriteSheetExport(sheetData, {
+    referenceType: "file",
+    assetPath: "./work/",
+  });
 
-  const sprite = importAsepriteSheetExport(sheetData);
   const sheet = new ProtoSpriteSheet();
-  sprite.name = "test";
   sheet.appendSprite(sprite);
+   const packedSpriteSheet = await packSpriteSheet(sheet);
 
-  const { renderQueue, size, packedBinsByBBoxKey, padding } =
-    repackSpriteSheet(sheet);
+  const sheetPngBytes = packedSpriteSheet.pixelSource?.pngBytes;
+  if (sheetPngBytes) fs.writeFileSync("./work/sheet.png", sheetPngBytes, { encoding: "binary" });
 
-  const canvas = createCanvas(size.width, size.height);
-  const ctx = canvas.getContext("2d", {
-    alpha: true
+  const packedSprite = packedSpriteSheet.sprites.at(0);
+
+  const instance = packedSprite.clone().createInstance();
+
+  const resultImg = await renderSpriteInstance(instance, {
+    excludeLayers: ["Engine"],
+    // assetPath: "./work/"
   });
-  for (const item of renderQueue) {
-    ctx.drawImage(
-      sheetImage,
-      item.sx,
-      item.sy,
-      item.sw,
-      item.sh,
-      item.dx,
-      item.dy,
-      item.dw,
-      item.dh
-    );
-  }
-
-  const pngBuffer = canvas.toBuffer("image/png");
-  const pngBytes = new Uint8Array(pngBuffer);
-
-  sprite.pixelSource = new ProtoSpritePixelSource();
-  sprite.pixelSource.inParentSheet = true;
-  sheet.pixelSource = new ProtoSpritePixelSource();
-  sheet.pixelSource.pngBytes = pngBytes;
-
-  let spriteIndex = 0;
-  for (const sprite of sheet.sprites) {
-    for (const frame of sprite.frames.values()) {
-      for (const frameLayer of frame.indexedLayers.values()) {
-        const transformed = packedBinsByBBoxKey.get(frameLayer);
-        if (transformed === undefined) throw new Error("Pack failed!");
-        frameLayer.sheetBBox.x = transformed.x + padding;
-        frameLayer.sheetBBox.y = transformed.y + padding;
-      }
-    }
-    spriteIndex++;
-  }
-
-  fs.writeFileSync("work/exported-bin.prsb", sheet.toBinary(), {
-    encoding: "binary"
-  });
+  const pngBytes = await resultImg.getBuffer("image/png");
+  fs.writeFileSync("./work/rendered.png", pngBytes, { encoding: "binary" });
 }
 
-async function rerender() {
+async function pack() {
   const rawBuff = fs.readFileSync("./work/exported-bin.prsb");
+
   const spriteSheet = ProtoSpriteSheet.fromBuffer(rawBuff);
   const pngBytes = spriteSheet.pixelSource?.pngBytes;
   if (!pngBytes) {
@@ -155,11 +109,10 @@ async function rerender() {
     const frame = sprite.frames.values().next()?.value;
     if (!frame) continue;
     for (const part of frame.indexedLayers.values()) {
-      console.log(part.sheetBBox, part.spriteBBox);
       res.blit({
         src: img,
-        x: part.spriteBBox.x,
-        y: part.spriteBBox.y,
+        x: part.spriteBBox.x - sprite.center.x + 100,
+        y: part.spriteBBox.y - sprite.center.y + 100,
         srcX: part.sheetBBox.x,
         srcY: part.sheetBBox.y,
         srcW: part.sheetBBox.width,

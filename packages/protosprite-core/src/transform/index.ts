@@ -1,3 +1,4 @@
-import { repackSpriteSheet } from "./repack";
+import { packSpriteSheet } from "./pack";
+import { renderSpriteInstance } from "./render";
 
-export { repackSpriteSheet };
+export { packSpriteSheet, renderSpriteInstance };

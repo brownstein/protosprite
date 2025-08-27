@@ -44,6 +44,7 @@ export function importAsepriteSheetExport(
   opt?: {
     referenceType?: "file" | "url";
     frameNameFormat?: string;
+    assetPath?: string;
   }
 ) {
   const sprite = new ProtoSprite();
@@ -169,9 +170,9 @@ export function importAsepriteSheetExport(
   const pixelSource = new ProtoSpritePixelSource();
   const isFile = opt?.referenceType === "file";
   if (isFile) {
-    pixelSource.fileName = sourceSheet.meta.image;
+    pixelSource.fileName = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
   } else {
-    pixelSource.url = sourceSheet.meta.image;
+    pixelSource.url =  `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
   }
 
   sprite.pixelSource = pixelSource;
@@ -281,6 +282,9 @@ export function importAsepriteSheetExport(
     }
   }
 
+  sprite.sortedFrameNumbers = [...sprite.frames.keys()];
+  sprite.sortedFrameNumbers.sort();
+
   // Build animations.
   if (hasTags) {
     for (const sourceTag of sourceSheet.meta.frameTags ?? []) {
@@ -290,6 +294,14 @@ export function importAsepriteSheetExport(
       animation.endIndex = sourceTag.to;
       sprite.appendAnimation(animation);
     }
+  }
+
+  // Find the center of the sprite.
+  const firstFrame = Array.isArray(sourceSheet.frames) ? sourceSheet.frames.at(0) : Object.values(sourceSheet.frames).at(0);
+  if (firstFrame !== undefined) {
+    const firstFrameSize = firstFrame.sourceSize;
+    sprite.center.x = Math.round(firstFrameSize.w * 0.5);
+    sprite.center.y = Math.round(firstFrameSize.h * 0.5);
   }
 
   return sprite;
