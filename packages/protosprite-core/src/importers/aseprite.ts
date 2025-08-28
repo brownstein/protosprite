@@ -31,13 +31,13 @@ type ExpectMatch = {
   extension?: boolean;
 };
 
-type Matcher = (frameName: string) => ({
+type Matcher = (frameName: string) => {
   title?: string;
   tag?: string;
   layer?: string;
   frame?: number;
   extension?: string;
-});
+};
 
 export function importAsepriteSheetExport(
   sourceSheet: Aseprite.SpriteSheet,
@@ -66,7 +66,9 @@ export function importAsepriteSheetExport(
   if (frameNameFormat === undefined) {
     const firstFrameNameParts = [
       ...firstFrameName.matchAll(/((?<part>[^\s\.]+)\s?)/g)
-    ].map((g) => g.groups?.part);
+    ]
+      .map((g) => g.groups?.part)
+      .filter((part) => part !== undefined && part !== "");
     if (
       firstFrameNameParts.at(-1) === "ase" ||
       firstFrameNameParts.at(-1) === "aseprite"
@@ -177,7 +179,7 @@ export function importAsepriteSheetExport(
   if (isFile) {
     pixelSource.fileName = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
   } else {
-    pixelSource.url =  `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
+    pixelSource.url = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
   }
 
   sprite.pixelSource = pixelSource;
@@ -290,7 +292,13 @@ export function importAsepriteSheetExport(
 
   if (opt?.debug) {
     for (const [frameIndex, frame] of sprite.frames) {
-      console.log("Found frame:", frameIndex, "with", frame.indexedLayers.size, "layers");
+      console.log(
+        "Found frame:",
+        frameIndex,
+        "with",
+        frame.indexedLayers.size,
+        "layers"
+      );
     }
   }
 
@@ -309,7 +317,9 @@ export function importAsepriteSheetExport(
   }
 
   // Find the center of the sprite.
-  const firstFrame = Array.isArray(sourceSheet.frames) ? sourceSheet.frames.at(0) : Object.values(sourceSheet.frames).at(0);
+  const firstFrame = Array.isArray(sourceSheet.frames)
+    ? sourceSheet.frames.at(0)
+    : Object.values(sourceSheet.frames).at(0);
   if (firstFrame !== undefined) {
     const firstFrameSize = firstFrame.sourceSize;
     sprite.center.x = Math.round(firstFrameSize.w * 0.5);

@@ -3,7 +3,7 @@ import { Box3, Color, LinearSRGBColorSpace, NoToneMapping, OrthographicCamera, S
 import './App.css';
 
 import { ProtoSpriteSheetThreeLoader, ProtoSpriteThree } from "protosprite-three";
-import wolf from "./wolf.prs";
+import fire from "./fire.prs";
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -15,7 +15,7 @@ function App() {
       iStateRendering.current = true;
 
       const loader = new ProtoSpriteSheetThreeLoader();
-      const sheet = await loader.loadAsync(wolf);
+      const sheet = await loader.loadAsync(fire);
       const canvas = canvasRef.current;
       if (!canvas) return;
       const renderer = new WebGLRenderer({
@@ -28,7 +28,7 @@ function App() {
 
       const drawSprites: ProtoSpriteThree[] = [];
       for (let i = 0; i < 1; i++) {
-        const sprite = sheet.getSprite(0);
+        const sprite = sheet.getSprite();
         sprite.hideLayers("bg");
         sprite.center();
         sprite.gotoAnimation("Idle");
@@ -44,10 +44,30 @@ function App() {
         drawSprites.push(sprite);
 
         const rndColor = () => new Color(Math.floor(Math.random() * 0xffffff));
-        sprite
-          .multiplyLayers(rndColor(), Math.random(), ["fur"])
-          .multiplyLayers(rndColor(), Math.random(), ["shirt"])
-          .multiplyLayers(rndColor(), Math.random(), ["pants"]);
+
+        sprite.hideLayers("Group 4", "Group 5", "Group 7");
+        sprite.fadeLayers(new Color(0x002266), 0.2, ["Smokes"]);
+        sprite.fadeLayers(new Color(0xffaa00), 0.5, ["White"]);
+        sprite.data.currentAnimationSpeed = 2;
+
+        const flameLayers = ["Layer 162", "Layer 91", "Layer 90", "Layer 89", "Layer 88", "Layer 87", "Layer 86"];
+        const color1 = rndColor(); // new Color(0xffdd11);
+        const color2 = rndColor(); // new new Color(0xff8811);
+        const color3 = rndColor(); // new Color(0x884422)
+        flameLayers.forEach((l, li) => {
+          const color = color1
+            .lerp(color2, 2 * li / flameLayers.length)
+            .lerp(color3, li / flameLayers.length);
+          sprite.fadeLayers(color, 1, [l]);
+          sprite.setLayerOpacity(0.5 + (1 - li / flameLayers.length) * 0.5, [l]);
+        });
+
+        // sprite
+        //   .multiplyLayers(rndColor(), Math.random(), ["fur"])
+        //   .multiplyLayers(rndColor(), Math.random(), ["shirt"])
+        //   .multiplyLayers(rndColor(), Math.random(), ["pants"])
+        //   .outlineLayers(1, new Color(0), 1, ["fur"])
+        //   .outlineLayers(1, new Color(1, 1, 1), 1, ["shirt"]);
       }
 
       const pos3 = new Vector3();
@@ -57,6 +77,8 @@ function App() {
 
       box3.getCenter(pos3);
       box3.getSize(size3);
+
+      size3.set(200, 200, 200);
 
       const camera = new OrthographicCamera(-size3.x * 0.5, size3.x * 0.5, size3.y * 0.5, -size3.y * 0.5, 0.1, 1000);
       camera.up = new Vector3(0, 1, 0);
@@ -82,7 +104,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <canvas ref={canvasRef} width="400" height="800" />
+        <canvas ref={canvasRef} width="800" height="800" />
         <p>
           Edit <code>src/App.tsx</code> and save to reload.
         </p>

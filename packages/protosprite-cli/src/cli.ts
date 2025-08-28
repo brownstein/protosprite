@@ -119,6 +119,7 @@ class ProtoSpriteCLI {
         if (this.args.debug) console.log("File to import:", this.workingDirectory + path.sep + sheetData.meta.image);
         const sprite = importAsepriteSheetExport(sheetData, {
           referenceType: "file",
+          frameNameFormat: "({layer}) {frame}",
           assetPath: this.workingDirectory + path.sep,
           debug: this.args.debug
         });

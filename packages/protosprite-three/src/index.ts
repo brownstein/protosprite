@@ -582,6 +582,31 @@ export class ProtoSpriteThree {
     return this;
   }
 
+  setLayerOpacity(opacity: number, layers: Iterable<string>) {
+    const layerWhitelist = new Set(layers);
+    const expandGroup = (layer: ProtoSpriteLayer) => {
+      if (layer.name === undefined) return;
+      layerWhitelist.add(layer.name);
+      layer.children.forEach(expandGroup);
+    };
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      expandGroup(layer);
+    }
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      let overrides = this.layerOverrides.get(layer.name);
+      if (overrides === undefined) {
+        overrides = {};
+        this.layerOverrides.set(layer.name, overrides);
+      }
+      overrides.opacity = opacity;
+    }
+    this.extraDirty = true;
+  }
+
   fadeAllLayers(color: Color, opacity: number = 1) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layer of this.data.data.layers) {
@@ -599,6 +624,16 @@ export class ProtoSpriteThree {
 
   fadeLayers(color: Color, opacity: number, layers: Iterable<string>) {
     const layerWhitelist = new Set(layers);
+    const expandGroup = (layer: ProtoSpriteLayer) => {
+      if (layer.name === undefined) return;
+      layerWhitelist.add(layer.name);
+      layer.children.forEach(expandGroup);
+    };
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      expandGroup(layer);
+    }
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layer of this.data.data.layers) {
       if (layer.name === undefined) continue;
@@ -632,6 +667,16 @@ export class ProtoSpriteThree {
   multiplyLayers(color: Color, opacity: number, layers: Iterable<string>) {
     const layerWhitelist = new Set(layers);
     const fade = new Vector4(color.r, color.g, color.b, opacity);
+    const expandGroup = (layer: ProtoSpriteLayer) => {
+      if (layer.name === undefined) return;
+      layerWhitelist.add(layer.name);
+      layer.children.forEach(expandGroup);
+    };
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      expandGroup(layer);
+    }
     for (const layer of this.data.data.layers) {
       if (layer.name === undefined) continue;
       if (!layerWhitelist.has(layer.name)) continue;
@@ -661,8 +706,23 @@ export class ProtoSpriteThree {
     return this;
   }
 
-  outlineLayers(thickness: number, color: Color, opacity: number, layers: Iterable<string>) {
+  outlineLayers(
+    thickness: number,
+    color: Color,
+    opacity: number,
+    layers: Iterable<string>
+  ) {
     const layerWhitelist = new Set(layers);
+    const expandGroup = (layer: ProtoSpriteLayer) => {
+      if (layer.name === undefined) return;
+      layerWhitelist.add(layer.name);
+      layer.children.forEach(expandGroup);
+    };
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      expandGroup(layer);
+    }
     for (const layer of this.data.data.layers) {
       if (layer.name === undefined) continue;
       if (!layerWhitelist.has(layer.name)) continue;
