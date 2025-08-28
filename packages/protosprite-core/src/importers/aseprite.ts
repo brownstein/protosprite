@@ -7,7 +7,7 @@ import {
   ProtoSpriteFrameLayer,
   ProtoSpriteLayer,
   ProtoSpritePixelSource
-} from "src/core/index";
+} from "../core/index.js";
 
 export class FrameNameUnknownError extends Error {
   constructor() {

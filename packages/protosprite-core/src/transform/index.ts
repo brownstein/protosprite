@@ -1,4 +1,4 @@
-import { packSpriteSheet } from "./pack";
-import { renderSpriteInstance } from "./render";
+import { packSpriteSheet } from "./pack.js";
+import { renderSpriteInstance } from "./render.js";
 
 export { packSpriteSheet, renderSpriteInstance };

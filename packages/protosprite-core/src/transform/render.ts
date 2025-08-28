@@ -1,6 +1,6 @@
 import { Jimp } from "jimp";
 
-import { ProtoSpriteInstance } from "src/core";
+import { ProtoSpriteInstance } from "../core/index.js";
 
 export async function renderSpriteInstance(
   spriteInstance: ProtoSpriteInstance,
@@ -72,7 +72,7 @@ export async function renderSpriteInstance(
     throw new Error("Unable to locate a suitable pixel source for rendering");
 
   spriteInstance.forEachLayerOfCurrentFrame((layerFrame) => {
-    console.log(layerFrame);
+    if (sourceImage === undefined) return;
     let layer = layerFrame.layer;
     let included = false;
     let excluded = false;
@@ -92,7 +92,6 @@ export async function renderSpriteInstance(
       layer = layer.parent;
     }
     if (included || !excluded) {
-      console.log(layerFrame.spriteBBox);
       resultImg.blit({
         src: sourceImage,
         srcX: layerFrame.sheetBBox.x,

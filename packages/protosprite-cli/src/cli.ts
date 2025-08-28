@@ -1,126 +1,224 @@
+import { Command } from "@commander-js/extra-typings";
 import * as aseprite from "@kayahr/aseprite";
 import childProcess from "child_process";
-import { Command } from "commander";
-import { EventEmitter } from "events";
 import fs from "fs";
 import { Jimp } from "jimp";
 import path from "path";
-import {
-  BBox,
-  ProtoSpriteFrameLayer,
-  ProtoSpritePixelSource,
-  ProtoSpriteSheet
-} from "protosprite-core";
+import { ProtoSpriteSheet } from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
-import { findAsperiteBinary } from "./util/findAseprite.js";
-import { packSpriteSheet, renderSpriteInstance } from "protosprite-core/transform";
+import {
+  packSpriteSheet,
+  renderSpriteInstance
+} from "protosprite-core/transform";
+import tmpDir from "temp-dir";
 
-const program = new Command();
-program
+import { findAsperiteBinary } from "./util/findAseprite.js";
+
+const program = new Command()
   .name("protosprite-cli")
   .description("Utilities for working with protosprite")
-  .version("0.0.1");
+  .version("0.0.1")
+  .option("--name [name...]", "Provide names for the imported sprites.")
+  .requiredOption("-i, --input [input...]", "Process an input file.")
+  .option("--output [output]", "output a ProtoSprite file.")
+  .option("--external-sheet", "output an exernal sprite sheet.")
+  .option("--preview [preview-output]", "output a preview file.")
+  .option("--json", "output in JSON format");
 
-program
-  .command("ingest")
-  .argument("input", "input aseprite file")
-  .action((inputStr) => {
-    exportSpriteSheet(inputStr);
-  });
+type ProtoSpriteCLIArgs = {
+  spriteNames?: string[];
+  inputFiles: string[];
+  outputAsepriteExportFileName?: string;
+  outputProtoSpriteFileName?: string;
+  outputSpriteSheetFileName?: string;
+  outputRenderedFileName?: string;
+  outputMode?: "binary" | "json";
+};
 
-program.command("render").action(renderSprite);
-program.command("pack").action(pack);
-
-program.parse();
-
-function exportSpriteSheet(targetFile: string) {
-  const asepriteBinPath = findAsperiteBinary();
-  const asepriteArgs = [
-    "-b",
-    "--sheet work/exported-sheet.png",
-    "--data work/exported-data.json",
-    "--format json-hash",
-    "--split-layers",
-    "--all-layers",
-    "--list-layers",
-    "--list-tags",
-    "--ignore-empty",
-    "--merge-duplicates",
-    "--border-padding 1",
-    "--shape-padding 1",
-    "--trim",
-    '--filename-format "({layer}) {frame}"',
-    targetFile
-  ];
-  childProcess.execSync(`${asepriteBinPath} ${asepriteArgs.join(" ")}`);
-}
-
-async function renderSprite() {
-  const sheetData = JSON.parse(
-    fs.readFileSync("./work/exported-data.json", { encoding: "utf8" })
-  ) as aseprite.SpriteSheet;
-  
-  const sprite = importAsepriteSheetExport(sheetData, {
-    referenceType: "file",
-    assetPath: "./work/",
-  });
-
-  const sheet = new ProtoSpriteSheet();
-  sheet.appendSprite(sprite);
-   const packedSpriteSheet = await packSpriteSheet(sheet);
-
-  const sheetPngBytes = packedSpriteSheet.pixelSource?.pngBytes;
-  if (sheetPngBytes) fs.writeFileSync("./work/sheet.png", sheetPngBytes, { encoding: "binary" });
-
-  const packedSprite = packedSpriteSheet.sprites.at(0);
-
-  const instance = packedSprite.clone().createInstance();
-
-  const resultImg = await renderSpriteInstance(instance, {
-    excludeLayers: ["Engine"],
-    // assetPath: "./work/"
-  });
-  const pngBytes = await resultImg.getBuffer("image/png");
-  fs.writeFileSync("./work/rendered.png", pngBytes, { encoding: "binary" });
-}
-
-async function pack() {
-  const rawBuff = fs.readFileSync("./work/exported-bin.prsb");
-
-  const spriteSheet = ProtoSpriteSheet.fromBuffer(rawBuff);
-  const pngBytes = spriteSheet.pixelSource?.pngBytes;
-  if (!pngBytes) {
-    console.log("Can't find PNG");
-    return;
+class ProtoSpriteCLI {
+  private args: ProtoSpriteCLIArgs;
+  private sheet?: ProtoSpriteSheet;
+  private workingDirectory = path.join(tmpDir, "protosprite");
+  constructor(args: ProtoSpriteCLIArgs) {
+    this.args = args;
   }
+  async _process() {
+    await this._loadFiles();
 
-  const img = await Jimp.read(
-    `data:image/png;base64,${Buffer.from(pngBytes).toString("base64")}`,
-    {
-      "image/png": {}
-    }
-  );
-  const res = new Jimp({
-    width: 200,
-    height: 200,
-  });
-
-  for (const sprite of spriteSheet.sprites) {
-    const frame = sprite.frames.values().next()?.value;
-    if (!frame) continue;
-    for (const part of frame.indexedLayers.values()) {
-      res.blit({
-        src: img,
-        x: part.spriteBBox.x - sprite.center.x + 100,
-        y: part.spriteBBox.y - sprite.center.y + 100,
-        srcX: part.sheetBBox.x,
-        srcY: part.sheetBBox.y,
-        srcW: part.sheetBBox.width,
-        srcH: part.sheetBBox.height
+    // Rename sprites in sheet.
+    const applyNames = this.args.spriteNames;
+    if (applyNames) {
+      this.sheet?.sprites.forEach((s, i) => {
+        if (i >= applyNames.length) return;
+        s.name = applyNames[i];
       });
     }
+    await this._saveFiles();
   }
+  private async _loadFiles() {
+    this.sheet = new ProtoSpriteSheet();
+    // Clear out working directory.
+    fs.rmSync(this.workingDirectory, {
+      recursive: true,
+      force: true
+    });
+    fs.mkdirSync(this.workingDirectory);
+    // Process files.
+    for (const inputFile of this.args.inputFiles) {
+      const inputFileParts = path.parse(inputFile);
 
-  const pngOut = await res.getBuffer("image/png");
-  fs.writeFileSync("./work/out.png", pngOut, { encoding: "binary" });
+      // Handle aseprite files exports automatically.
+      if (
+        inputFileParts.ext.endsWith("ase") ||
+        inputFileParts.ext.endsWith("aseprite")
+      ) {
+        const workFileName = path.join(
+          this.workingDirectory,
+          inputFileParts.base
+        );
+        fs.copyFileSync(inputFile, workFileName);
+        const workExportSheetName = path.join(
+          this.workingDirectory,
+          `${inputFileParts.name}.json`
+        );
+        const workExportPngName = path.join(
+          this.workingDirectory,
+          `${inputFileParts.name}.png`
+        );
+        const asepriteBinPath = findAsperiteBinary();
+        const asepriteArgs = [
+          "-b",
+          "--sheet",
+          workExportPngName,
+          "--data",
+          workExportSheetName,
+          "--format json-hash",
+          "--split-layers",
+          "--all-layers",
+          "--list-layers",
+          "--list-tags",
+          "--ignore-empty",
+          "--merge-duplicates",
+          "--border-padding 1",
+          "--shape-padding 1",
+          "--trim",
+          '--filename-format "({layer}) {frame}"',
+          workFileName
+        ];
+        childProcess.execSync(`${asepriteBinPath} ${asepriteArgs.join(" ")}`);
+        const sheetData = JSON.parse(
+          fs.readFileSync(workExportSheetName, { encoding: "utf8" })
+        ) as aseprite.SpriteSheet;
+        const sprite = importAsepriteSheetExport(sheetData, {
+          referenceType: "file",
+          assetPath: this.workingDirectory + path.sep
+        });
+        this.sheet.appendSprite(sprite);
+        continue;
+      }
+
+      // Handle binary ProtoSprite sheet files.
+      const rawBuff = fs.readFileSync(inputFile);
+      this.sheet = ProtoSpriteSheet.fromBuffer(rawBuff.buffer);
+    }
+  }
+  private async _saveFiles() {
+    if (!this.sheet) return;
+
+    // Produce packed sprite on demand.
+    if (
+      this.args.outputProtoSpriteFileName ||
+      this.args.outputSpriteSheetFileName
+    ) {
+      this.sheet = await packSpriteSheet(this.sheet);
+      if (!this.sheet) throw new Error("Missing sprite sheet after packing.");
+
+      // In sheet export mode, remove the embedded buffer.
+      if (this.args.outputSpriteSheetFileName) {
+        if (this.sheet?.pixelSource?.pngBytes) {
+          const pngFileName = this.args.outputSpriteSheetFileName;
+          fs.writeFileSync(pngFileName, this.sheet.pixelSource.pngBytes, {
+            encoding: "binary"
+          });
+          this.sheet.pixelSource.fileName = pngFileName;
+          this.sheet.pixelSource.pngBytes = undefined;
+        }
+      }
+
+      if (this.args.outputProtoSpriteFileName) {
+        if (this.args.outputMode === "json") {
+          const jsonStr = JSON.stringify(this.sheet.toJsonObject());
+          fs.writeFileSync(this.args.outputProtoSpriteFileName, jsonStr, {
+            encoding: "utf8"
+          });
+        } else {
+          const binBuff = this.sheet?.toBinary();
+          fs.writeFileSync(this.args.outputProtoSpriteFileName, binBuff, {
+            encoding: "binary"
+          });
+        }
+      }
+    }
+
+    if (!this.sheet) return;
+
+    // Render output preview on demand.
+    if (this.args.outputRenderedFileName) {
+      let totalWidth = 0;
+      let totalHeight = 0;
+      for (const sprite of this.sheet.sprites) {
+        totalWidth += sprite.center.x * 2;
+        totalHeight = Math.max(totalHeight, sprite.center.y * 2);
+      }
+      const outputImg = new Jimp({
+        width: totalWidth,
+        height: totalHeight
+      });
+      let xOffset = 0;
+      for (const sprite of this.sheet.sprites) {
+        const yOffset = 0;
+        const renderedSpriteImg = await renderSpriteInstance(
+          sprite.createInstance()
+        );
+        outputImg.blit({
+          src: renderedSpriteImg,
+          x: xOffset,
+          y: yOffset,
+          srcX: 0,
+          srcY: 0,
+          srcW: renderedSpriteImg.width,
+          srcH: renderedSpriteImg.height
+        });
+        xOffset += sprite.center.x * 2;
+      }
+      await outputImg.write(
+        this.args.outputRenderedFileName as "string.string"
+      );
+    }
+  }
 }
+
+program.parse();
+const opts = program.opts();
+
+let args: ProtoSpriteCLIArgs = {
+  inputFiles: []
+};
+
+if (opts.name && Array.isArray(opts.name)) args.spriteNames = opts.name;
+if (opts.input && Array.isArray(opts.input)) args.inputFiles = opts.input;
+if (typeof opts.output === "string")
+  args.outputProtoSpriteFileName = opts.output;
+if (opts.externalSheet && args.outputProtoSpriteFileName) {
+  const sheetFileName = path.parse(args.outputProtoSpriteFileName);
+  args.outputSpriteSheetFileName = path.join(
+    sheetFileName.dir,
+    `${sheetFileName.name}.png`
+  );
+}
+if (typeof opts.preview === "string")
+  args.outputRenderedFileName = opts.preview;
+if (opts.json) args.outputMode = "json";
+
+const cli = new ProtoSpriteCLI(args);
+await cli._process();

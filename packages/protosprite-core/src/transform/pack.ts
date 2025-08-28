@@ -6,7 +6,7 @@ import {
   ProtoSpriteFrameLayer,
   ProtoSpritePixelSource,
   ProtoSpriteSheet
-} from "src/core";
+} from "../core/index.js";
 
 // These types are a cludge to get this to work both in-browser and with node canvas.
 export type BBoxTransformation = (spriteIndex: number, bbox: BBox) => BBox;

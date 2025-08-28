@@ -5,6 +5,7 @@ import {
   BBoxSchema,
   EmbeddedSpriteSheetSchema,
   EmbeddedSpriteSheet_Encoding,
+  ExternalSpriteSheetSchema,
   FrameSchema,
   Frame_FrameLayerSchema,
   LayerSchema,
@@ -13,15 +14,15 @@ import {
   SpriteSchema,
   SpriteSheet,
   SpriteSheetSchema
-} from "proto_dist/sprite_pb";
+} from "../../proto_dist/sprite_pb.js";
 
 import {
   TypedEventEmitter,
   createTypedEventEmitter
-} from "src/util/TypedEventEmitter";
+} from "../util/TypedEventEmitter.js";
 
-export { TypedEventEmitter };
-
+export { createTypedEventEmitter };
+export type { TypedEventEmitter };
 export class BBox {
   public x = 0;
   public y = 0;
@@ -210,9 +211,9 @@ export class ProtoSprite {
       layerToIndex.set(layer, layerIndex);
       return outLayer;
     });
-    for (const [frameIndex, frame] of this.frames) {
+    for (const frame of this.frames.values()) {
       const outFrame = create(FrameSchema);
-      outFrame.frameIndex = frameIndex;
+      outFrame.frameIndex = frame.index;
       outFrame.duration = frame.duration;
       for (const layerFrame of frame.indexedLayers.values()) {
         if (layerFrame.layer === undefined) continue;
@@ -252,6 +253,7 @@ export class ProtoSprite {
     const nameToLayer = new Map<string, ProtoSpriteLayer>();
     out.layers = proto.layers.map((protoLayer, layerIndex) => {
       const layer = new ProtoSpriteLayer();
+      layer.index = layerIndex;
       if (protoLayer.name !== "") {
         layer.name = protoLayer.name;
       }
@@ -273,13 +275,14 @@ export class ProtoSprite {
         }
       }
     });
-    proto.frames.forEach((protoFrame, frameIndex) => {
+    proto.frames.forEach((protoFrame) => {
       const frame = new ProtoSpriteFrame();
-      frame.index = frameIndex;
+      frame.index = protoFrame.frameIndex;
       for (const protoFrameLayer of protoFrame.layers) {
         const layer = indexToLayer.get(protoFrameLayer.layerIndex);
         if (layer === undefined) continue;
         const frameLayer = new ProtoSpriteFrameLayer();
+        frameLayer.layer = layer;
         frameLayer.frame = frame;
         if (protoFrameLayer.sheetBbox) {
           frameLayer.sheetBBox.fromProto(protoFrameLayer.sheetBbox);
@@ -290,10 +293,10 @@ export class ProtoSprite {
         frame.indexedLayers.set(protoFrameLayer.layerIndex, frameLayer);
       }
       frame.duration = protoFrame.duration;
-      out.frames.set(frameIndex, frame);
+      out.frames.set(protoFrame.frameIndex, frame);
     });
     out.sortedFrameNumbers = [...out.frames.keys()];
-    out.sortedFrameNumbers.sort();
+    out.sortedFrameNumbers.sort((a, b) => (a - b));
     proto.animations.forEach((protoAnimation, animationIndex) => {
       const animation = new ProtoSpriteAnimation();
       animation.name = protoAnimation.name;
@@ -312,6 +315,21 @@ export class ProtoSprite {
       sprite.pixelSource.value = create(EmbeddedSpriteSheetSchema);
       sprite.pixelSource.value.data = this.pixelSource.pngBytes;
       sprite.pixelSource.value.encoding = EmbeddedSpriteSheet_Encoding.PNG;
+      return sprite;
+    }
+    if (this.pixelSource?.fileName !== undefined) {
+      sprite.pixelSource.case = "externalSheet";
+      sprite.pixelSource.value = create(ExternalSpriteSheetSchema);
+      sprite.pixelSource.value.source.case = "fileName";
+      sprite.pixelSource.value.source.value = this.pixelSource.fileName;
+      return sprite;
+    }
+    if (this.pixelSource?.url !== undefined) {
+      sprite.pixelSource.case = "externalSheet";
+      sprite.pixelSource.value = create(ExternalSpriteSheetSchema);
+      sprite.pixelSource.value.source.case = "url";
+      sprite.pixelSource.value.source.value = this.pixelSource.url;
+      return sprite;
     }
     return sprite;
   }
@@ -406,10 +424,17 @@ export class ProtoSpriteSheet {
   }
 
   toBinary() {
-    const result = create(SpriteSheetSchema);
-    result.sprites = this.sprites.map((s) => s.toProtoWithoutSource());
-    this.attachSourcePixelsToProto(result);
-    return toBinary(SpriteSheetSchema, result);
+    const sheetProto = create(SpriteSheetSchema);
+    sheetProto.sprites = this.sprites.map((s) => s.toProtoWithoutSource());
+    this.attachSourcePixelsToProto(sheetProto);
+    return toBinary(SpriteSheetSchema, sheetProto);
+  }
+
+  toJsonObject() {
+    const sheetProto = create(SpriteSheetSchema);
+    sheetProto.sprites = this.sprites.map((s) => s.toProtoWithoutSource());
+    this.attachSourcePixelsToProto(sheetProto);
+    return toJson(SpriteSheetSchema, sheetProto);
   }
 
   attachSourcePixelsToProto(spriteSheet: SpriteSheet) {
@@ -420,6 +445,18 @@ export class ProtoSpriteSheet {
       spriteSheet.pixelSource.value.data = this.pixelSource.pngBytes;
       spriteSheet.pixelSource.value.encoding = EmbeddedSpriteSheet_Encoding.PNG;
     }
+    if (this.pixelSource?.fileName !== undefined) {
+      spriteSheet.pixelSource.case = "externalSheet";
+      spriteSheet.pixelSource.value = create(ExternalSpriteSheetSchema);
+      spriteSheet.pixelSource.value.source.case = "fileName";
+      spriteSheet.pixelSource.value.source.value = this.pixelSource.fileName;
+    }
+    if (this.pixelSource?.url !== undefined) {
+      spriteSheet.pixelSource.case = "externalSheet";
+      spriteSheet.pixelSource.value = create(ExternalSpriteSheetSchema);
+      spriteSheet.pixelSource.value.source.case = "url";
+      spriteSheet.pixelSource.value.source.value = this.pixelSource.url;
+    }
     let spriteIndex = 0;
     for (const sprite of this.sprites) {
       const spriteResult = spriteSheet.sprites.at(spriteIndex++);
@@ -429,7 +466,7 @@ export class ProtoSpriteSheet {
     return spriteSheet;
   }
 
-  static fromBuffer(buff: Buffer<ArrayBuffer>) {
+  static fromBuffer(buff: ArrayBufferLike) {
     const uint8Array = new Uint8Array(buff);
     const decoded = fromBinary(SpriteSheetSchema, uint8Array);
     const result = new ProtoSpriteSheet();
@@ -500,6 +537,26 @@ export class ProtoSpriteInstance {
     }
   }
 
+  switchToAnimation(animationName: string | null) {
+    let swapped = false;
+    if (animationName === null) {
+      swapped = true;
+      this.currentAnimation = undefined;
+    } else {
+      const animation = this.data.animation(animationName);
+      if (animation) {
+        this.currentAnimation = animation;
+        this.currentFrame = animation.startIndex;
+        this.currentFrameIndex = this.data.sortedFrameNumbers.indexOf(this.currentFrame);
+        this.currentFrameDurationRemaining = this.data.frames.get(this.currentFrame)?.duration ?? 100;
+        swapped = true;
+      } else {
+        swapped = false;
+      }
+    }
+    return swapped;
+  }
+
   advanceByDuration(advanceDuration: number): boolean {
     this.currentFrameDurationRemaining -= Math.abs(
       advanceDuration * this.currentAnimationSpeed
@@ -510,14 +567,14 @@ export class ProtoSpriteInstance {
     while (this.currentFrameDurationRemaining <= 0) {
       framesDone.push(this.currentFrame);
       if (this.currentAnimationSpeed < 0) {
-        this.currentFrameDurationRemaining -=
-          advanceDuration * this.currentAnimationSpeed;
         this.currentFrameIndex--;
         if (this.currentFrameIndex < 0) {
           this.currentFrameIndex = this.data.sortedFrameNumbers.length - 1;
           this.currentFrame =
             this.data.sortedFrameNumbers[this.currentFrameIndex];
           animationLooped = true;
+        } else {
+          this.currentFrame = this.data.sortedFrameNumbers[this.currentFrameIndex];
         }
         if (
           this.currentAnimation !== undefined &&
@@ -529,15 +586,16 @@ export class ProtoSpriteInstance {
           );
           animationLooped = true;
         }
+        this.currentFrameDurationRemaining += this.data.frames.get(this.currentFrame)?.duration ?? 100;
       } else {
-        this.currentFrameDurationRemaining +=
-          advanceDuration * this.currentAnimationSpeed;
         this.currentFrameIndex++;
         if (this.currentFrameIndex >= this.data.sortedFrameNumbers.length) {
           this.currentFrameIndex = 0;
           this.currentFrame =
             this.data.sortedFrameNumbers[this.currentFrameIndex];
           animationLooped = true;
+        } else {
+          this.currentFrame = this.data.sortedFrameNumbers[this.currentFrameIndex];
         }
         if (
           this.currentAnimation !== undefined &&
@@ -549,6 +607,7 @@ export class ProtoSpriteInstance {
           );
           animationLooped = true;
         }
+        this.currentFrameDurationRemaining += this.data.frames.get(this.currentFrame)?.duration ?? 100;
       }
     }
     for (const frameNo of framesDone) {
