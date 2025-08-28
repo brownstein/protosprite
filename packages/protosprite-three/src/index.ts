@@ -327,10 +327,15 @@ export class ProtoSpriteThree {
     }
 
     this.mesh.onBeforeRender = () => {
-      if (this.positionDirty) this.updateGeometry();
-      this.positionDirty = false;
-      if (this.extraDirty) this.updateExtra();
-      this.extraDirty = false;
+      if (this.positionDirty) {
+        this.updateGeometry();
+        this.positionDirty = false;
+        this.extraDirty = true;
+      }
+      if (this.extraDirty) {
+        this.updateExtra();
+        this.extraDirty = false;
+      }
     };
 
     this.updateGeometry();
@@ -462,6 +467,8 @@ export class ProtoSpriteThree {
         opacityArr[i4 + 1] = overrides.opacity;
         opacityArr[i4 + 2] = overrides.opacity;
         opacityArr[i4 + 3] = overrides.opacity;
+      } else {
+        opacityArr.fill(1, i4, i4 + 4);
       }
 
       if (overrides.color !== undefined) {
@@ -469,6 +476,8 @@ export class ProtoSpriteThree {
         overrides.color.toArray(colorMultArr, i16 + 4);
         overrides.color.toArray(colorMultArr, i16 + 8);
         overrides.color.toArray(colorMultArr, i16 + 12);
+      } else {
+        colorMultArr.fill(0, i16, i16 + 16);
       }
 
       if (overrides.fade !== undefined) {
@@ -476,6 +485,8 @@ export class ProtoSpriteThree {
         overrides.fade.toArray(colorFadeArr, i16 + 4);
         overrides.fade.toArray(colorFadeArr, i16 + 8);
         overrides.fade.toArray(colorFadeArr, i16 + 12);
+      } else {
+        colorFadeArr.fill(0, i16, i16 + 16);
       }
 
       if (overrides.outline !== undefined) {
@@ -483,6 +494,8 @@ export class ProtoSpriteThree {
         overrides.outline.toArray(outlineArr, i16 + 4);
         overrides.outline.toArray(outlineArr, i16 + 8);
         overrides.outline.toArray(outlineArr, i16 + 12);
+      } else {
+        outlineArr.fill(0, i16, i16 + 16);
       }
 
       if (overrides.outlineThickness !== undefined) {
@@ -490,6 +503,8 @@ export class ProtoSpriteThree {
         outlineThicknessArr[i4 + 1] = overrides.outlineThickness;
         outlineThicknessArr[i4 + 2] = overrides.outlineThickness;
         outlineThicknessArr[i4 + 3] = overrides.outlineThickness;
+      } else {
+        outlineThicknessArr.fill(0, i4, i4 + 4);
       }
     });
 
@@ -502,6 +517,7 @@ export class ProtoSpriteThree {
 
   advance(ms: number) {
     this.positionDirty ||= this.protoSpriteInstance.advanceByDuration(ms);
+    return this;
   }
 
   gotoAnimation(animationName: string | null) {
@@ -513,11 +529,13 @@ export class ProtoSpriteThree {
   hideLayers(...layerNames: string[]) {
     for (const layerName of layerNames) this.hiddenLayerNames.add(layerName);
     this.positionDirty = true;
+    return this;
   }
 
   showLayers(...layerNames: string[]) {
     for (const layerName of layerNames) this.hiddenLayerNames.delete(layerName);
     this.positionDirty = true;
+    return this;
   }
 
   center() {
@@ -562,6 +580,7 @@ export class ProtoSpriteThree {
   setOpacity(opacity: number) {
     this.mainLayer.material.uniforms.opacity.value = opacity;
     this.mainLayer.material.uniformsNeedUpdate = true;
+    return this;
   }
 
   fadeAllLayers(color: Color, opacity: number = 1) {
@@ -576,6 +595,24 @@ export class ProtoSpriteThree {
       overrides.fade = fade;
     }
     this.extraDirty = true;
+    return this;
+  }
+
+  fadeLayers(color: Color, opacity: number, layers: Iterable<string>) {
+    const layerWhitelist = new Set(layers);
+    const fade = new Vector4(color.r, color.g, color.b, opacity);
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      let overrides = this.layerOverrides.get(layer.name);
+      if (overrides === undefined) {
+        overrides = {};
+        this.layerOverrides.set(layer.name, overrides);
+      }
+      overrides.fade = fade;
+    }
+    this.extraDirty = true;
+    return this;
   }
 
   multiplyAllLayers(color: Color, opacity: number = 1) {
@@ -590,6 +627,24 @@ export class ProtoSpriteThree {
       overrides.color = fade;
     }
     this.extraDirty = true;
+    return this;
+  }
+
+  multiplyLayers(color: Color, opacity: number, layers: Iterable<string>) {
+    const layerWhitelist = new Set(layers);
+    const fade = new Vector4(color.r, color.g, color.b, opacity);
+    for (const layer of this.data.data.layers) {
+      if (layer.name === undefined) continue;
+      if (!layerWhitelist.has(layer.name)) continue;
+      let overrides = this.layerOverrides.get(layer.name);
+      if (overrides === undefined) {
+        overrides = {};
+        this.layerOverrides.set(layer.name, overrides);
+      }
+      overrides.color = fade;
+    }
+    this.extraDirty = true;
+    return this;
   }
 
   outlineAllLayers(thickness: number, color: Color, opacity: number = 1) {
@@ -604,6 +659,7 @@ export class ProtoSpriteThree {
       overrides.outline = new Vector4(color.r, color.g, color.b, opacity);
     }
     this.extraDirty = true;
+    return this;
   }
 
   outlineLayers(thickness: number, color: Color, opacity: number, layers: Iterable<string>) {
@@ -620,6 +676,7 @@ export class ProtoSpriteThree {
       overrides.outline = new Vector4(color.r, color.g, color.b, opacity);
     }
     this.extraDirty = true;
+    return this;
   }
 
   get size() {

@@ -45,7 +45,7 @@ function App() {
         drawSprites.push(sprite);
 
         sprite.outlineLayers(1, new Color(0, 0.8, 1), 1, ["head"]);
-        sprite.multiplyAllLayers(new Color(0), 0.5);
+        sprite.multiplyAllLayers(new Color(0), 1).fadeLayers(new Color(0xffffff), 1, ["sword_test"]);
       }
 
       const pos3 = new Vector3();
