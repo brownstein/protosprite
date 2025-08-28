@@ -1,4 +1,5 @@
 import { create, fromBinary, toBinary, toJson } from "@bufbuild/protobuf";
+
 import {
   AnimationSchema,
   BBox as BBoxProto,
@@ -15,7 +16,6 @@ import {
   SpriteSheet,
   SpriteSheetSchema
 } from "../../proto_dist/sprite_pb.js";
-
 import {
   TypedEventEmitter,
   createTypedEventEmitter
@@ -296,7 +296,7 @@ export class ProtoSprite {
       out.frames.set(protoFrame.frameIndex, frame);
     });
     out.sortedFrameNumbers = [...out.frames.keys()];
-    out.sortedFrameNumbers.sort((a, b) => (a - b));
+    out.sortedFrameNumbers.sort((a, b) => a - b);
     proto.animations.forEach((protoAnimation, animationIndex) => {
       const animation = new ProtoSpriteAnimation();
       animation.name = protoAnimation.name;
@@ -357,7 +357,9 @@ export class ProtoSprite {
     for (const otherLayer of other.layers) {
       if (otherLayer.parent === undefined) continue;
       const parentIndex = otherLayer.parent.index;
-      const otherParentLayer = other.layers.find(l => l.index === parentIndex);
+      const otherParentLayer = other.layers.find(
+        (l) => l.index === parentIndex
+      );
       if (otherParentLayer === undefined) continue;
       otherLayer.parent = otherParentLayer;
       otherParentLayer.children.push(otherLayer);
@@ -547,8 +549,11 @@ export class ProtoSpriteInstance {
       if (animation) {
         this.currentAnimation = animation;
         this.currentFrame = animation.startIndex;
-        this.currentFrameIndex = this.data.sortedFrameNumbers.indexOf(this.currentFrame);
-        this.currentFrameDurationRemaining = this.data.frames.get(this.currentFrame)?.duration ?? 100;
+        this.currentFrameIndex = this.data.sortedFrameNumbers.indexOf(
+          this.currentFrame
+        );
+        this.currentFrameDurationRemaining =
+          this.data.frames.get(this.currentFrame)?.duration ?? 100;
         swapped = true;
       } else {
         swapped = false;
@@ -574,7 +579,8 @@ export class ProtoSpriteInstance {
             this.data.sortedFrameNumbers[this.currentFrameIndex];
           animationLooped = true;
         } else {
-          this.currentFrame = this.data.sortedFrameNumbers[this.currentFrameIndex];
+          this.currentFrame =
+            this.data.sortedFrameNumbers[this.currentFrameIndex];
         }
         if (
           this.currentAnimation !== undefined &&
@@ -586,7 +592,8 @@ export class ProtoSpriteInstance {
           );
           animationLooped = true;
         }
-        this.currentFrameDurationRemaining += this.data.frames.get(this.currentFrame)?.duration ?? 100;
+        this.currentFrameDurationRemaining +=
+          this.data.frames.get(this.currentFrame)?.duration ?? 100;
       } else {
         this.currentFrameIndex++;
         if (this.currentFrameIndex >= this.data.sortedFrameNumbers.length) {
@@ -595,7 +602,8 @@ export class ProtoSpriteInstance {
             this.data.sortedFrameNumbers[this.currentFrameIndex];
           animationLooped = true;
         } else {
-          this.currentFrame = this.data.sortedFrameNumbers[this.currentFrameIndex];
+          this.currentFrame =
+            this.data.sortedFrameNumbers[this.currentFrameIndex];
         }
         if (
           this.currentAnimation !== undefined &&
@@ -607,7 +615,8 @@ export class ProtoSpriteInstance {
           );
           animationLooped = true;
         }
-        this.currentFrameDurationRemaining += this.data.frames.get(this.currentFrame)?.duration ?? 100;
+        this.currentFrameDurationRemaining +=
+          this.data.frames.get(this.currentFrame)?.duration ?? 100;
       }
     }
     for (const frameNo of framesDone) {

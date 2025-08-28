@@ -14,4 +14,4 @@ export function findAsperiteBinary() {
     "MacOS",
     "aseprite"
   );
-};
+}

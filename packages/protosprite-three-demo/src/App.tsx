@@ -1,8 +1,20 @@
-import { useEffect, useRef } from 'react';
-import { Box3, Color, LinearSRGBColorSpace, NoToneMapping, OrthographicCamera, Scene, Vector3, WebGLRenderer } from 'three';
-import './App.css';
+import {
+  ProtoSpriteSheetThreeLoader,
+  ProtoSpriteThree
+} from "protosprite-three";
+import { useEffect, useRef } from "react";
+import {
+  Box3,
+  Color,
+  LinearSRGBColorSpace,
+  NoToneMapping,
+  OrthographicCamera,
+  Scene,
+  Vector3,
+  WebGLRenderer
+} from "three";
 
-import { ProtoSpriteSheetThreeLoader, ProtoSpriteThree } from "protosprite-three";
+import "./App.css";
 import fire from "./fire.prs";
 
 function App() {
@@ -20,7 +32,7 @@ function App() {
       if (!canvas) return;
       const renderer = new WebGLRenderer({
         canvas,
-        alpha: true,
+        alpha: true
       });
       renderer.toneMapping = NoToneMapping;
       renderer.outputColorSpace = LinearSRGBColorSpace;
@@ -50,16 +62,26 @@ function App() {
         sprite.fadeLayers(new Color(0xffaa00), 0.5, ["White"]);
         sprite.data.currentAnimationSpeed = 2;
 
-        const flameLayers = ["Layer 162", "Layer 91", "Layer 90", "Layer 89", "Layer 88", "Layer 87", "Layer 86"];
+        const flameLayers = [
+          "Layer 162",
+          "Layer 91",
+          "Layer 90",
+          "Layer 89",
+          "Layer 88",
+          "Layer 87",
+          "Layer 86"
+        ];
         const color1 = rndColor(); // new Color(0xffdd11);
         const color2 = rndColor(); // new new Color(0xff8811);
         const color3 = rndColor(); // new Color(0x884422)
         flameLayers.forEach((l, li) => {
           const color = color1
-            .lerp(color2, 2 * li / flameLayers.length)
+            .lerp(color2, (2 * li) / flameLayers.length)
             .lerp(color3, li / flameLayers.length);
           sprite.fadeLayers(color, 1, [l]);
-          sprite.setLayerOpacity(0.5 + (1 - li / flameLayers.length) * 0.5, [l]);
+          sprite.setLayerOpacity(0.5 + (1 - li / flameLayers.length) * 0.5, [
+            l
+          ]);
         });
 
         // sprite
@@ -80,7 +102,14 @@ function App() {
 
       size3.set(200, 200, 200);
 
-      const camera = new OrthographicCamera(-size3.x * 0.5, size3.x * 0.5, size3.y * 0.5, -size3.y * 0.5, 0.1, 1000);
+      const camera = new OrthographicCamera(
+        -size3.x * 0.5,
+        size3.x * 0.5,
+        size3.y * 0.5,
+        -size3.y * 0.5,
+        0.1,
+        1000
+      );
       camera.up = new Vector3(0, 1, 0);
       camera.position.copy(pos3);
       camera.position.z += 100;
@@ -97,7 +126,7 @@ function App() {
         }
         renderer.render(scene, camera);
       }
-    }
+    };
     doTheThing();
   }, []);
 

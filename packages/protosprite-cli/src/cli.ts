@@ -45,10 +45,15 @@ class ProtoSpriteCLI {
     this.args = args;
   }
   async _process() {
-    if (this.args.debug) console.log("[debug] working directory:", this.workingDirectory);
+    if (this.args.debug)
+      console.log("[debug] working directory:", this.workingDirectory);
     if (this.args.debug) console.log("[debug] loading files...");
     await this._loadFiles();
-    if (this.args.debug) console.log("[debug] loaded files:", this.sheet?.sprites.map(sprite => sprite.name).join(" "));
+    if (this.args.debug)
+      console.log(
+        "[debug] loaded files:",
+        this.sheet?.sprites.map((sprite) => sprite.name).join(" ")
+      );
 
     // Rename sprites in sheet.
     const applyNames = this.args.spriteNames;
@@ -116,7 +121,11 @@ class ProtoSpriteCLI {
         const sheetData = JSON.parse(
           fs.readFileSync(workExportSheetName, { encoding: "utf8" })
         ) as aseprite.SpriteSheet;
-        if (this.args.debug) console.log("File to import:", this.workingDirectory + path.sep + sheetData.meta.image);
+        if (this.args.debug)
+          console.log(
+            "File to import:",
+            this.workingDirectory + path.sep + sheetData.meta.image
+          );
         const sprite = importAsepriteSheetExport(sheetData, {
           referenceType: "file",
           frameNameFormat: "({layer}) {frame}",

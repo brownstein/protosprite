@@ -15,12 +15,8 @@
     "types": ["jest", "node"],
     "baseUrl": ".",
     "paths": {
-      "src/*": [
-        "./src/*"
-      ],
-      "proto_dist/*": [
-        "./proto_dist/*"
-      ]
+      "src/*": ["./src/*"],
+      "proto_dist/*": ["./proto_dist/*"]
     },
     "plugins": [{ "transform": "@zerollup/ts-transform-paths" }]
   },

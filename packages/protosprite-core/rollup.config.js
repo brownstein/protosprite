@@ -11,7 +11,7 @@ export default {
     dir: "dist",
     format: "es",
     paths: {
-      "protobufjs/minimal": "protobufjs/minimal.js",
+      "protobufjs/minimal": "protobufjs/minimal.js"
     },
     sourcemap: true,
     preserveModules: true

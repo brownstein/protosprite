@@ -7,5 +7,5 @@ export default {
   printWidth: 80,
   importOrder: ["<THIRD_PARTY_MODULES>", "^src/(.*)$", "^[./]"],
   importOrderSeparation: true,
-  importOrderSortSpecifiers: true,
+  importOrderSortSpecifiers: true
 };
