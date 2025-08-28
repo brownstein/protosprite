@@ -170,7 +170,7 @@ export async function packSpriteSheet(
   });
 
   result.pixelSource = new ProtoSpritePixelSource();
-  result.pixelSource.pngBytes = new Uint8Array(resultPng.buffer);
+  result.pixelSource.pngBytes = new Uint8Array(resultPng);
 
   return result;
 }

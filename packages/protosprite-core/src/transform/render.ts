@@ -8,6 +8,7 @@ export async function renderSpriteInstance(
     includeLayers?: string[];
     excludeLayers?: string[];
     assetPath?: string;
+    debug?: boolean;
   }
 ) {
   const includeLayers = opt?.includeLayers
@@ -40,10 +41,13 @@ export async function renderSpriteInstance(
     const url =
       spriteInstance.data.pixelSource?.url ??
       spriteInstance.data.pixelSource?.fileName;
-    if (url)
-      sourceImage = await Jimp.read(`${opt?.assetPath ?? ""}${url}`, {
+    if (url) {
+      const urlPath = `${opt?.assetPath ?? ""}${url}`;
+      if (opt?.debug) console.log("Attempting to read URL:", urlPath);
+      sourceImage = await Jimp.read(urlPath, {
         "image/png": {}
       });
+    }
   }
   if (
     sourceImage === undefined &&
@@ -62,10 +66,13 @@ export async function renderSpriteInstance(
     const url =
       spriteInstance.data.sheet?.pixelSource?.url ??
       spriteInstance.data.sheet?.pixelSource?.fileName;
-    if (url)
-      sourceImage = await Jimp.read(`${opt?.assetPath ?? ""}${url}`, {
+    if (url) {
+      const urlPath = `${opt?.assetPath ?? ""}${url}`;
+      if (opt?.debug) console.log("Attempting to read URL:", urlPath);
+      sourceImage = await Jimp.read(urlPath, {
         "image/png": {}
       });
+    }
   }
 
   if (sourceImage === undefined)

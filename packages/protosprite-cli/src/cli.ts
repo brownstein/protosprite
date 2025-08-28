@@ -23,7 +23,8 @@ const program = new Command()
   .option("--output [output]", "output a ProtoSprite file.")
   .option("--external-sheet", "output an exernal sprite sheet.")
   .option("--preview [preview-output]", "output a preview file.")
-  .option("--json", "output in JSON format");
+  .option("--json", "output in JSON format")
+  .option("--debug", "enable debug logging.");
 
 type ProtoSpriteCLIArgs = {
   spriteNames?: string[];
@@ -33,6 +34,7 @@ type ProtoSpriteCLIArgs = {
   outputSpriteSheetFileName?: string;
   outputRenderedFileName?: string;
   outputMode?: "binary" | "json";
+  debug?: boolean;
 };
 
 class ProtoSpriteCLI {
@@ -43,7 +45,10 @@ class ProtoSpriteCLI {
     this.args = args;
   }
   async _process() {
+    if (this.args.debug) console.log("[debug] working directory:", this.workingDirectory);
+    if (this.args.debug) console.log("[debug] loading files...");
     await this._loadFiles();
+    if (this.args.debug) console.log("[debug] loaded files:", this.sheet?.sprites.map(sprite => sprite.name).join(" "));
 
     // Rename sprites in sheet.
     const applyNames = this.args.spriteNames;
@@ -53,6 +58,8 @@ class ProtoSpriteCLI {
         s.name = applyNames[i];
       });
     }
+
+    if (this.args.debug) console.log("[debug] saving files...");
     await this._saveFiles();
   }
   private async _loadFiles() {
@@ -109,10 +116,13 @@ class ProtoSpriteCLI {
         const sheetData = JSON.parse(
           fs.readFileSync(workExportSheetName, { encoding: "utf8" })
         ) as aseprite.SpriteSheet;
+        if (this.args.debug) console.log("File to import:", this.workingDirectory + path.sep + sheetData.meta.image);
         const sprite = importAsepriteSheetExport(sheetData, {
           referenceType: "file",
-          assetPath: this.workingDirectory + path.sep
+          assetPath: this.workingDirectory + path.sep,
+          debug: this.args.debug
         });
+        if (this.args.debug) console.log("Imported file:", sprite.name);
         this.sheet.appendSprite(sprite);
         continue;
       }
@@ -130,6 +140,7 @@ class ProtoSpriteCLI {
       this.args.outputProtoSpriteFileName ||
       this.args.outputSpriteSheetFileName
     ) {
+      if (args.debug) console.log("Packing sprite sheet...");
       this.sheet = await packSpriteSheet(this.sheet);
       if (!this.sheet) throw new Error("Missing sprite sheet after packing.");
 
@@ -178,7 +189,10 @@ class ProtoSpriteCLI {
       for (const sprite of this.sheet.sprites) {
         const yOffset = 0;
         const renderedSpriteImg = await renderSpriteInstance(
-          sprite.createInstance()
+          sprite.createInstance(),
+          {
+            debug: this.args.debug
+          }
         );
         outputImg.blit({
           src: renderedSpriteImg,
@@ -219,6 +233,7 @@ if (opts.externalSheet && args.outputProtoSpriteFileName) {
 if (typeof opts.preview === "string")
   args.outputRenderedFileName = opts.preview;
 if (opts.json) args.outputMode = "json";
+if (opts.debug) args.debug = true;
 
 const cli = new ProtoSpriteCLI(args);
 await cli._process();

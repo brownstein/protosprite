@@ -3,8 +3,7 @@ import { Box3, Color, LinearSRGBColorSpace, NoToneMapping, OrthographicCamera, S
 import './App.css';
 
 import { ProtoSpriteSheetThreeLoader, ProtoSpriteThree } from "protosprite-three";
-import aResource from "./enemies_test.prs";
-// import aResource from "./protag.prs";
+import wolf from "./wolf.prs";
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -16,7 +15,7 @@ function App() {
       iStateRendering.current = true;
 
       const loader = new ProtoSpriteSheetThreeLoader();
-      const sheet = await loader.loadAsync(aResource);
+      const sheet = await loader.loadAsync(wolf);
       const canvas = canvasRef.current;
       if (!canvas) return;
       const renderer = new WebGLRenderer({
@@ -28,24 +27,27 @@ function App() {
       const scene = new Scene();
 
       const drawSprites: ProtoSpriteThree[] = [];
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 1; i++) {
         const sprite = sheet.getSprite(0);
         sprite.hideLayers("bg");
         sprite.center();
         sprite.gotoAnimation("Idle");
         if (Math.random() > 0.5) sprite.gotoAnimation("Casting");
-        sprite.data.currentAnimationSpeed = 0.5 + Math.random();
+        sprite.data.currentAnimationSpeed = 1 + Math.random();
         sprite.mesh.scale.y = -1;
         if (Math.random() > 0.5) sprite.mesh.scale.x = -1;
-        sprite.mesh.position.x = Math.random() * 500;
-        sprite.mesh.position.y = Math.random() * 500;
+        sprite.mesh.position.x = Math.random() * 200;
+        sprite.mesh.position.y = Math.random() * 200;
         sprite.mesh.position.z = Math.random() * 50;
         sprite.mesh.position.round();
         scene.add(sprite.mesh);
         drawSprites.push(sprite);
 
-        sprite.outlineLayers(1, new Color(0, 0.8, 1), 1, ["head"]);
-        sprite.multiplyAllLayers(new Color(0), 1).fadeLayers(new Color(0xffffff), 1, ["sword_test"]);
+        const rndColor = () => new Color(Math.floor(Math.random() * 0xffffff));
+        sprite
+          .multiplyLayers(rndColor(), Math.random(), ["fur"])
+          .multiplyLayers(rndColor(), Math.random(), ["shirt"])
+          .multiplyLayers(rndColor(), Math.random(), ["pants"]);
       }
 
       const pos3 = new Vector3();
@@ -70,14 +72,6 @@ function App() {
         const delta = tEnd - tStart;
         for (const sprite of drawSprites) {
           sprite.advance(delta);
-          if (Math.random() > 0.99) {
-            sprite.clearLayerAdjustments();
-            const randomLayerIndex = Math.floor(Math.random() * sprite.data.data.layers.length);
-            const layerName = sprite.data.data.layers.at(randomLayerIndex)?.name;
-            if (layerName !== undefined) {
-              sprite.fadeLayers(new Color(0xff0000), 0.5, [layerName]);
-            }
-          }
         }
         renderer.render(scene, camera);
       }
@@ -88,7 +82,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <canvas ref={canvasRef} width="500" height="500" />
+        <canvas ref={canvasRef} width="400" height="800" />
         <p>
           Edit <code>src/App.tsx</code> and save to reload.
         </p>

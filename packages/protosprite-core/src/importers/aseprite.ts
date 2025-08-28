@@ -45,6 +45,7 @@ export function importAsepriteSheetExport(
     referenceType?: "file" | "url";
     frameNameFormat?: string;
     assetPath?: string;
+    debug?: boolean;
   }
 ) {
   const sprite = new ProtoSprite();
@@ -143,6 +144,10 @@ export function importAsepriteSheetExport(
     isFirstPart = false;
   }
 
+  if (opt?.debug) {
+    console.log("Matching on parts:", matchParts.join(""));
+  }
+
   // With all that out of the way, we can finally infer the sprite's name if it exists.
   const frameNameMatcherRegex = new RegExp(matchParts.join(""));
   const matcher: Matcher = (frameName: string) => {
@@ -176,6 +181,7 @@ export function importAsepriteSheetExport(
   }
 
   sprite.pixelSource = pixelSource;
+  if (opt?.debug) console.log("pixel source:", sprite.pixelSource);
 
   const hasLayers = sourceSheet.meta.layers !== undefined;
   const hasTags = sourceSheet.meta.frameTags !== undefined;
@@ -236,7 +242,7 @@ export function importAsepriteSheetExport(
     return frame;
   };
   if (Array.isArray(sourceSheet.frames)) {
-    let autoFrameIndex = 1;
+    let autoFrameIndex = 0;
     for (const sourceFrame of sourceSheet.frames) {
       const frameKey = sourceFrame.filename;
       const frameMatch = matcher(frameKey);
@@ -259,7 +265,7 @@ export function importAsepriteSheetExport(
       frame.indexedLayers.set(frameLayer.layer?.index ?? 0, frameLayer);
     }
   } else {
-    let autoFrameIndex = 1;
+    let autoFrameIndex = 0;
     for (const [frameKey, sourceFrame] of Object.entries(sourceSheet.frames)) {
       const frameMatch = matcher(frameKey);
       const frameNo = frameMatch.frame ?? autoFrameIndex++;
@@ -279,6 +285,12 @@ export function importAsepriteSheetExport(
       frameLayer.spriteBBox.width = sourceFrame.spriteSourceSize.w;
       frameLayer.spriteBBox.height = sourceFrame.spriteSourceSize.h;
       frame.indexedLayers.set(frameLayer.layer?.index ?? 0, frameLayer);
+    }
+  }
+
+  if (opt?.debug) {
+    for (const [frameIndex, frame] of sprite.frames) {
+      console.log("Found frame:", frameIndex, "with", frame.indexedLayers.size, "layers");
     }
   }
 
