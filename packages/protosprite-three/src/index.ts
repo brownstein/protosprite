@@ -459,8 +459,7 @@ export class ProtoSpriteThree {
       const i4 = i * 4;
       const i16 = i * 16;
 
-      const overrides = this.layerOverrides.get(layer.name ?? "*");
-      if (overrides === undefined) return;
+      const overrides = this.layerOverrides.get(layer.name ?? "*") ?? {};
 
       if (overrides.opacity !== undefined) {
         opacityArr[i4 + 0] = overrides.opacity;
@@ -675,6 +674,12 @@ export class ProtoSpriteThree {
       overrides.outlineThickness = thickness;
       overrides.outline = new Vector4(color.r, color.g, color.b, opacity);
     }
+    this.extraDirty = true;
+    return this;
+  }
+
+  clearLayerAdjustments() {
+    this.layerOverrides.clear();
     this.extraDirty = true;
     return this;
   }

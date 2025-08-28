@@ -3,8 +3,8 @@ import { Box3, Color, LinearSRGBColorSpace, NoToneMapping, OrthographicCamera, S
 import './App.css';
 
 import { ProtoSpriteSheetThreeLoader, ProtoSpriteThree } from "protosprite-three";
-// import aResource from "./enemies_test.prs";
-import aResource from "./protag.prs";
+import aResource from "./enemies_test.prs";
+// import aResource from "./protag.prs";
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -70,6 +70,14 @@ function App() {
         const delta = tEnd - tStart;
         for (const sprite of drawSprites) {
           sprite.advance(delta);
+          if (Math.random() > 0.99) {
+            sprite.clearLayerAdjustments();
+            const randomLayerIndex = Math.floor(Math.random() * sprite.data.data.layers.length);
+            const layerName = sprite.data.data.layers.at(randomLayerIndex)?.name;
+            if (layerName !== undefined) {
+              sprite.fadeLayers(new Color(0xff0000), 0.5, [layerName]);
+            }
+          }
         }
         renderer.render(scene, camera);
       }
