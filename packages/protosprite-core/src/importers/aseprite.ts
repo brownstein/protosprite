@@ -1,13 +1,14 @@
 import * as Aseprite from "@kayahr/aseprite";
 
 import {
-  ProtoSprite,
-  ProtoSpriteAnimation,
-  ProtoSpriteFrame,
-  ProtoSpriteFrameLayer,
-  ProtoSpriteLayer,
-  ProtoSpritePixelSource
-} from "../core/index.js";
+  AnimationData,
+  ExternalSpriteSheetData,
+  FrameData,
+  FrameLayerData,
+  LayerData,
+  SizeData,
+  SpriteData
+} from "../core/data.js";
 
 export class FrameNameUnknownError extends Error {
   constructor() {
@@ -48,7 +49,7 @@ export function importAsepriteSheetExport(
     debug?: boolean;
   }
 ) {
-  const sprite = new ProtoSprite();
+  const sprite = new SpriteData();
 
   let frameNameFormat = opt?.frameNameFormat;
   let nameFormatHasExtension = false;
@@ -174,7 +175,7 @@ export function importAsepriteSheetExport(
     sprite.name = firstMatch.title;
   }
 
-  const pixelSource = new ProtoSpritePixelSource();
+  const pixelSource = new ExternalSpriteSheetData();
   const isFile = opt?.referenceType === "file";
   if (isFile) {
     pixelSource.fileName = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
@@ -189,18 +190,18 @@ export function importAsepriteSheetExport(
   const hasTags = sourceSheet.meta.frameTags !== undefined;
 
   // Build layers.
-  const layersByName = new Map<string, ProtoSpriteLayer>();
-  let getLayer: (layerName: string) => ProtoSpriteLayer | undefined;
+  const layersByName = new Map<string, LayerData>();
+  let getLayer: (layerName: string) => LayerData;
   if (hasLayers) {
     let layerIndex = 0;
     // Generate layers.
     for (const sourceLayer of sourceSheet.meta.layers ?? []) {
-      const layer = new ProtoSpriteLayer();
+      const layer = new LayerData();
       layer.name = sourceLayer.name;
       layer.opacity = sourceLayer.opacity ?? layer.opacity;
       layer.index = layerIndex++;
       layersByName.set(sourceLayer.name, layer);
-      sprite.appendLayer(layer);
+      sprite.layers.push(layer);
     }
     // Assign parents.
     for (const sourceLayer of sourceSheet.meta.layers ?? []) {
@@ -212,35 +213,49 @@ export function importAsepriteSheetExport(
       )
         continue;
       const parent = layersByName.get(sourceLayer.group);
-      if (parent !== undefined) parent.addChild(layer);
+      if (parent !== undefined) {
+        layer.parentIndex = parent.index;
+        parent.isGroup = true;
+      }
     }
     // Assign layer getter.
-    getLayer = (layerName: string) => layersByName.get(layerName);
+    getLayer = (layerName: string) => {
+      const layer = layersByName.get(layerName);
+      if (!layer) throw new Error("Layer not found.");
+      return layer;
+    };
   } else if (expectMatch.layer) {
     let layerIndex = 0;
     getLayer = (layerName: string) => {
       const extant = layersByName.get(layerName);
       if (extant !== undefined) return extant;
-      const newLayer = new ProtoSpriteLayer();
+      const newLayer = new LayerData();
       newLayer.name = layerName;
       newLayer.index = layerIndex++;
-      sprite.appendLayer(newLayer);
+      layersByName.set(newLayer.name, newLayer);
+      sprite.layers.push(newLayer);
       return newLayer;
     };
   } else {
-    const defaultLayer = new ProtoSpriteLayer();
+    const defaultLayer = new LayerData();
     defaultLayer.name = "default";
-    sprite.appendLayer(defaultLayer);
+    defaultLayer.index = 0;
+    layersByName.set(defaultLayer.name, defaultLayer);
+    sprite.layers.push(defaultLayer);
     getLayer = () => defaultLayer;
   }
 
   // Build frames.
-  const getFrame = (frameNumber: number) => {
-    const extant = sprite.frames.get(frameNumber);
+  const framesByIndex = new Map<number, FrameData>();
+  const minFrameIndex = 0;
+  let maxFrameIndex = 0;
+  const getFrame = (frameIndex: number) => {
+    const extant = framesByIndex.get(frameIndex);
     if (extant !== undefined) return extant;
-    const frame = new ProtoSpriteFrame();
-    frame.index = frameNumber;
-    sprite.appendFrame(frame);
+    const frame = new FrameData();
+    frame.index = frameIndex;
+    maxFrameIndex = Math.max(frameIndex, frame.index);
+    framesByIndex.set(frameIndex, frame);
     return frame;
   };
   if (Array.isArray(sourceSheet.frames)) {
@@ -253,18 +268,15 @@ export function importAsepriteSheetExport(
       frame.duration = sourceFrame.duration;
       const frameLayerName = frameMatch.layer ?? "default";
       const layer = getLayer(frameLayerName);
-      const frameLayer = new ProtoSpriteFrameLayer();
-      frameLayer.frame = frame;
-      frameLayer.layer = layer;
-      frameLayer.sheetBBox.x = sourceFrame.frame.x;
-      frameLayer.sheetBBox.y = sourceFrame.frame.y;
-      frameLayer.sheetBBox.width = sourceFrame.frame.w;
-      frameLayer.sheetBBox.height = sourceFrame.frame.h;
-      frameLayer.spriteBBox.x = sourceFrame.spriteSourceSize.x;
-      frameLayer.spriteBBox.y = sourceFrame.spriteSourceSize.y;
-      frameLayer.spriteBBox.width = sourceFrame.spriteSourceSize.w;
-      frameLayer.spriteBBox.height = sourceFrame.spriteSourceSize.h;
-      frame.indexedLayers.set(frameLayer.layer?.index ?? 0, frameLayer);
+      const frameLayer = new FrameLayerData();
+      frameLayer.layerIndex = layer.index;
+      frameLayer.size.width = sourceFrame.frame.w;
+      frameLayer.size.height = sourceFrame.frame.h;
+      frameLayer.sheetPosition.x = sourceFrame.frame.x;
+      frameLayer.sheetPosition.y = sourceFrame.frame.y;
+      frameLayer.spritePosition.x = sourceFrame.spriteSourceSize.x;
+      frameLayer.spritePosition.y = sourceFrame.spriteSourceSize.y;
+      frame.layers.push(frameLayer);
     }
   } else {
     let autoFrameIndex = 0;
@@ -275,44 +287,40 @@ export function importAsepriteSheetExport(
       frame.duration = sourceFrame.duration;
       const frameLayerName = frameMatch.layer ?? "default";
       const layer = getLayer(frameLayerName);
-      const frameLayer = new ProtoSpriteFrameLayer();
-      frameLayer.frame = frame;
-      frameLayer.layer = layer;
-      frameLayer.sheetBBox.x = sourceFrame.frame.x;
-      frameLayer.sheetBBox.y = sourceFrame.frame.y;
-      frameLayer.sheetBBox.width = sourceFrame.frame.w;
-      frameLayer.sheetBBox.height = sourceFrame.frame.h;
-      frameLayer.spriteBBox.x = sourceFrame.spriteSourceSize.x;
-      frameLayer.spriteBBox.y = sourceFrame.spriteSourceSize.y;
-      frameLayer.spriteBBox.width = sourceFrame.spriteSourceSize.w;
-      frameLayer.spriteBBox.height = sourceFrame.spriteSourceSize.h;
-      frame.indexedLayers.set(frameLayer.layer?.index ?? 0, frameLayer);
+      const frameLayer = new FrameLayerData();
+      frameLayer.layerIndex = layer.index;
+      frameLayer.size.width = sourceFrame.frame.w;
+      frameLayer.size.height = sourceFrame.frame.h;
+      frameLayer.sheetPosition.x = sourceFrame.frame.x;
+      frameLayer.sheetPosition.y = sourceFrame.frame.y;
+      frameLayer.spritePosition.x = sourceFrame.spriteSourceSize.x;
+      frameLayer.spritePosition.y = sourceFrame.spriteSourceSize.y;
+      frame.layers.push(frameLayer);
     }
   }
 
-  if (opt?.debug) {
-    for (const [frameIndex, frame] of sprite.frames) {
-      console.log(
-        "Found frame:",
-        frameIndex,
-        "with",
-        frame.indexedLayers.size,
-        "layers"
-      );
+  const orderedFrames = [...framesByIndex.values()];
+  orderedFrames.sort((a, b) => a.index - b.index);
+  let orderedFrameIndex = 0;
+  for (let i = minFrameIndex; i <= maxFrameIndex; i++) {
+    let frame = orderedFrames.at(orderedFrameIndex);
+    if (frame !== undefined && frame.index === i) {
+      orderedFrameIndex++;
+    } else {
+      frame = new FrameData();
+      frame.index = i;
     }
+    sprite.frames.push(frame);
   }
-
-  sprite.sortedFrameNumbers = [...sprite.frames.keys()];
-  sprite.sortedFrameNumbers.sort();
 
   // Build animations.
   if (hasTags) {
     for (const sourceTag of sourceSheet.meta.frameTags ?? []) {
-      const animation = new ProtoSpriteAnimation();
+      const animation = new AnimationData();
       animation.name = sourceTag.name;
-      animation.startIndex = sourceTag.from;
-      animation.endIndex = sourceTag.to;
-      sprite.appendAnimation(animation);
+      animation.indexStart = sourceTag.from;
+      animation.indexEnd = sourceTag.to;
+      sprite.animations.push(animation);
     }
   }
 
@@ -322,8 +330,9 @@ export function importAsepriteSheetExport(
     : Object.values(sourceSheet.frames).at(0);
   if (firstFrame !== undefined) {
     const firstFrameSize = firstFrame.sourceSize;
-    sprite.center.x = Math.round(firstFrameSize.w * 0.5);
-    sprite.center.y = Math.round(firstFrameSize.h * 0.5);
+    sprite.size = new SizeData();
+    sprite.size.width = firstFrameSize.w;
+    sprite.size.height = firstFrameSize.h;
   }
 
   return sprite;

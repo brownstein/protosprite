@@ -3,7 +3,7 @@ import { Jimp } from "jimp";
 
 import {
   BBox,
-  ProtoSpriteFrameLayer,
+  FrameLayerData,
   ProtoSpritePixelSource,
   ProtoSpriteSheet
 } from "../core/index.js";
@@ -13,7 +13,7 @@ export type BBoxTransformation = (spriteIndex: number, bbox: BBox) => BBox;
 
 type BinWithFrameLayers = Bin & {
   spriteIndex: number;
-  frameLayers: ProtoSpriteFrameLayer[];
+  frameLayers: FrameLayerData[];
   pixelSource?: ProtoSpritePixelSource;
 };
 

@@ -2,29 +2,29 @@ syntax = "proto3";
 
 package protosprite;
 
-// This message represents a 2D bounding box.
-message BBox {
-  int32 x = 1;
-  int32 y = 2;
-  int32 width = 3;
-  int32 height = 4;
-};
+import "google/protobuf/wrappers.proto";
 
-// 2D coordinates without sizing.
+// 2D coordinates.
 message Position {
   int32 x = 1;
   int32 y = 2;
 };
 
+message Size {
+  int32 width = 1;
+  int32 height = 2;
+}
+
 // This message represents one frame of the sprite.
 message Frame {
-  int32 frame_index = 1;
+  int32 index = 1;
 
   // Since frames can have multiple layers, we embed all non-empty layers here.
   message FrameLayer {
     int32 layer_index = 1;
-    BBox sheet_bbox = 2;
-    BBox sprite_bbox = 3;
+    Size size = 2;
+    Position sheet_position = 3;
+    Position sprite_position = 4;
   }
 
   repeated FrameLayer layers = 2;
@@ -34,9 +34,9 @@ message Frame {
 // Sprites can have named layers, and these layers can be nested.
 message Layer {
   string name = 1;
-  string parent_layer_name = 2;
-  float opacity = 3;
-  bool opacity_set = 4;
+  bool is_group = 2;
+  google.protobuf.Int32Value parent_index = 3;
+  google.protobuf.FloatValue opacity = 4;
 };
 
 // Sprites can have any number of overlapping animations.
@@ -78,7 +78,7 @@ message Sprite {
   repeated Frame frames = 5;
   repeated Layer layers = 6;
   repeated Animation animations = 7;
-  Position center = 8;
+  Size size = 8;
 };
 
 // Sprite sheet message.
