@@ -303,7 +303,7 @@ export function isEmbeddedSpriteSheetData(
 
 export function isExternalSpriteSheetData(
   data: EmbeddedSpriteSheetData | ExternalSpriteSheetData | undefined
-): data is EmbeddedSpriteSheetData {
+): data is ExternalSpriteSheetData {
   if (data === undefined) return false;
   return !!(data as ExternalSpriteSheetData)._isExternalData;
 }
@@ -411,5 +411,12 @@ export class SpriteSheetData {
       proto.pixelSource.value = this.pixelSource.toProto();
     }
     return proto;
+  }
+
+  clone(deep = false) {
+    const other = new SpriteSheetData();
+    other.sprites = other.sprites.map((sprite) => sprite.clone(deep));
+    other.pixelSource = this.pixelSource?.clone(deep);
+    return other;
   }
 }

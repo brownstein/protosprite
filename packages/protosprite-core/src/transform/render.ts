@@ -1,6 +1,7 @@
 import { Jimp } from "jimp";
 
 import { ProtoSpriteInstance } from "../core/index.js";
+import { JimpData, readPixelSourceToJimp } from "./util.js";
 
 export async function renderSpriteInstance(
   spriteInstance: ProtoSpriteInstance,
@@ -19,97 +20,45 @@ export async function renderSpriteInstance(
     : undefined;
 
   const resultImg = new Jimp({
-    width: spriteInstance.data.center.x * 2,
-    height: spriteInstance.data.center.y * 2
+    width: spriteInstance.sprite.data.size.width,
+    height: spriteInstance.sprite.data.size.height
   });
 
-  let sourceImage: Awaited<ReturnType<typeof Jimp.read>> | undefined;
-  if (
-    sourceImage === undefined &&
-    spriteInstance.data.pixelSource?.pngBytes !== undefined
-  ) {
-    const stringifiedBuffer = `data:image/png;base64,${Buffer.from(spriteInstance.data.pixelSource.pngBytes).toString("base64")}`;
-    sourceImage = await Jimp.read(stringifiedBuffer, {
-      "image/png": {}
-    });
+  let sourceImg: JimpData | undefined;
+  if (spriteInstance.sprite.data.pixelSource !== undefined) {
+    sourceImg =
+      (await readPixelSourceToJimp(spriteInstance.sprite.data.pixelSource)) ??
+      undefined;
   }
   if (
-    sourceImage === undefined &&
-    (spriteInstance.data.pixelSource?.url ??
-      spriteInstance.data.pixelSource?.fileName) !== undefined
+    sourceImg === undefined &&
+    spriteInstance.sprite.sheet?.data.pixelSource !== undefined
   ) {
-    const url =
-      spriteInstance.data.pixelSource?.url ??
-      spriteInstance.data.pixelSource?.fileName;
-    if (url) {
-      const urlPath = `${opt?.assetPath ?? ""}${url}`;
-      if (opt?.debug) console.log("Attempting to read URL:", urlPath);
-      sourceImage = await Jimp.read(urlPath, {
-        "image/png": {}
-      });
-    }
+    sourceImg =
+      (await readPixelSourceToJimp(
+        spriteInstance.sprite.sheet.data.pixelSource
+      )) ?? undefined;
   }
-  if (
-    sourceImage === undefined &&
-    spriteInstance.data.sheet?.pixelSource?.pngBytes !== undefined
-  ) {
-    const stringifiedBuffer = `data:image/png;base64,${Buffer.from(spriteInstance.data.sheet.pixelSource.pngBytes).toString("base64")}`;
-    sourceImage = await Jimp.read(stringifiedBuffer, {
-      "image/png": {}
-    });
-  }
-  if (
-    sourceImage === undefined &&
-    (spriteInstance.data.sheet?.pixelSource?.url ??
-      spriteInstance.data.sheet?.pixelSource?.fileName) !== undefined
-  ) {
-    const url =
-      spriteInstance.data.sheet?.pixelSource?.url ??
-      spriteInstance.data.sheet?.pixelSource?.fileName;
-    if (url) {
-      const urlPath = `${opt?.assetPath ?? ""}${url}`;
-      if (opt?.debug) console.log("Attempting to read URL:", urlPath);
-      sourceImage = await Jimp.read(urlPath, {
-        "image/png": {}
-      });
-    }
-  }
-
-  if (sourceImage === undefined)
+  if (sourceImg === undefined)
     throw new Error("Unable to locate a suitable pixel source for rendering");
 
-  spriteInstance.forEachLayerOfCurrentFrame((layerFrame) => {
-    if (sourceImage === undefined) return;
-    let layer = layerFrame.layer;
-    let included = false;
-    let excluded = false;
-    while (layer !== undefined) {
-      if (includeLayers !== undefined) {
-        if (includeLayers.has(layer.name ?? "*")) {
-          included = true;
-          break;
-        }
-      }
-      if (excludeLayers !== undefined) {
-        if (excludeLayers.has(layer.name ?? "*")) {
-          excluded = true;
-          break;
-        }
-      }
-      layer = layer.parent;
-    }
-    if (included || !excluded) {
-      resultImg.blit({
-        src: sourceImage,
-        srcX: layerFrame.sheetBBox.x,
-        srcY: layerFrame.sheetBBox.y,
-        srcW: layerFrame.sheetBBox.width,
-        srcH: layerFrame.sheetBBox.height,
-        x: layerFrame.spriteBBox.x,
-        y: layerFrame.spriteBBox.y
-      });
-    }
-  });
+  const frame =
+    spriteInstance.sprite.data.frames[
+      spriteInstance.animationState.currentFrame
+    ];
+  if (frame === undefined) throw new Error("Current frame not found.");
+
+  for (const layerFrame of frame.layers) {
+    resultImg.blit({
+      src: sourceImg,
+      srcX: layerFrame.sheetPosition.x,
+      srcY: layerFrame.sheetPosition.y,
+      srcW: layerFrame.size.width,
+      srcH: layerFrame.size.height,
+      x: layerFrame.spritePosition.x,
+      y: layerFrame.spritePosition.y
+    });
+  }
 
   return resultImg;
 }

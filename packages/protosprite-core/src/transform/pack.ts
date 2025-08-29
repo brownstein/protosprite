@@ -2,43 +2,54 @@ import pack, { Bin } from "bin-pack";
 import { Jimp } from "jimp";
 
 import {
-  BBox,
+  EmbeddedSpriteSheetData,
   FrameLayerData,
-  ProtoSpritePixelSource,
-  ProtoSpriteSheet
-} from "../core/index.js";
+  PositionData,
+  SizeData,
+  SpriteSheetData
+} from "src/core/data.js";
 
-// These types are a cludge to get this to work both in-browser and with node canvas.
-export type BBoxTransformation = (spriteIndex: number, bbox: BBox) => BBox;
+import {
+  JimpData,
+  SupportedPixelSource,
+  readPixelSourceToJimp
+} from "./util.js";
 
 type BinWithFrameLayers = Bin & {
   spriteIndex: number;
   frameLayers: FrameLayerData[];
-  pixelSource?: ProtoSpritePixelSource;
+  pixelSource?: SupportedPixelSource;
 };
 
 export async function packSpriteSheet(
-  sheet: ProtoSpriteSheet,
+  sheet: SpriteSheetData,
   opt?: {
     padding: number;
   }
-): Promise<ProtoSpriteSheet> {
+): Promise<SpriteSheetData> {
   const { padding = 2 } = opt ?? {};
 
-  const bboxKey = (spriteIndex: number, bbox: BBox) =>
-    `${spriteIndex}:${bbox.x}:${bbox.y}:${bbox.width}:${bbox.height}`;
+  const spriteLayerFrameKey = (
+    spriteIndex: number,
+    size: SizeData,
+    pos: PositionData
+  ) => `${spriteIndex}:${pos.x}:${pos.y}:${size.width}:${size.height}`;
   const bins: BinWithFrameLayers[] = [];
   const binsByBBoxKey = new Map<string, BinWithFrameLayers>();
 
   sheet.sprites.forEach((sprite, spriteIndex) => {
-    for (const frame of sprite.frames.values()) {
-      for (const frameLayer of frame.indexedLayers.values()) {
-        const frameSourceKey = bboxKey(spriteIndex, frameLayer.sheetBBox);
+    for (const frame of sprite.frames) {
+      for (const frameLayer of frame.layers) {
+        const frameSourceKey = spriteLayerFrameKey(
+          spriteIndex,
+          frameLayer.size,
+          frameLayer.sheetPosition
+        );
         let frameBin = binsByBBoxKey.get(frameSourceKey);
         if (!frameBin) {
           frameBin = {
-            width: frameLayer.sheetBBox.width + padding * 2,
-            height: frameLayer.sheetBBox.height + padding * 2,
+            width: frameLayer.size.width + padding * 2,
+            height: frameLayer.size.height + padding * 2,
             spriteIndex,
             frameLayers: [],
             pixelSource: sprite.pixelSource
@@ -54,48 +65,19 @@ export async function packSpriteSheet(
   const packed = pack(bins);
 
   // Load pixel sources.
-  const pixelSourceToJimp = new WeakMap<
-    ProtoSpritePixelSource,
-    Awaited<ReturnType<typeof Jimp.read>>
-  >();
+  const pixelSourceToJimp = new WeakMap<SupportedPixelSource, JimpData>();
   let parentSheetPixelSourceUsed = false;
   for (const sprite of sheet.sprites) {
     if (sprite.pixelSource === undefined) continue;
-    if (sprite.pixelSource.inParentSheet) {
-      parentSheetPixelSourceUsed = true;
-      continue;
-    }
-    if (sprite.pixelSource.pngBytes) {
-      const stringifiedBuffer = `data:image/png;base64,${Buffer.from(sprite.pixelSource.pngBytes).toString("base64")}`;
-      const img = await Jimp.read(stringifiedBuffer, {
-        "image/png": {}
-      });
+    const img = await readPixelSourceToJimp(sprite.pixelSource);
+    if (img) {
       pixelSourceToJimp.set(sprite.pixelSource, img);
-      continue;
-    }
-    const urlOrFileName = sprite.pixelSource.url ?? sprite.pixelSource.fileName;
-    if (urlOrFileName !== undefined) {
-      const img = await Jimp.read(urlOrFileName);
-      pixelSourceToJimp.set(sprite.pixelSource, img);
-    } else {
-      console.warn("Unable to get sprite pixel source data...");
     }
   }
-  if (parentSheetPixelSourceUsed && sheet.pixelSource !== undefined) {
-    if (sheet.pixelSource.pngBytes) {
-      const stringifiedBuffer = `data:image/png;base64,${Buffer.from(sheet.pixelSource.pngBytes).toString("base64")}`;
-      const img = await Jimp.read(stringifiedBuffer, {
-        "image/png": {}
-      });
+  if (sheet.pixelSource !== undefined) {
+    const img = await readPixelSourceToJimp(sheet.pixelSource);
+    if (img) {
       pixelSourceToJimp.set(sheet.pixelSource, img);
-    } else {
-      const urlOrFileName = sheet.pixelSource.url ?? sheet.pixelSource.fileName;
-      if (urlOrFileName !== undefined) {
-        const img = await Jimp.read(urlOrFileName);
-        pixelSourceToJimp.set(sheet.pixelSource, img);
-      } else {
-        console.warn("No suitable PNG found...");
-      }
     }
   }
 
@@ -104,38 +86,38 @@ export async function packSpriteSheet(
     width: packed.width,
     height: packed.height
   });
-  const keyToNewBBox = new Map<string, BBox>();
+  const spriteFrameKeyToNewPosition = new Map<string, PositionData>();
   for (const resBin of packed.items) {
-    if (resBin.item.pixelSource === undefined) continue;
-    let img = pixelSourceToJimp.get(resBin.item.pixelSource);
-    if (
-      img === undefined &&
-      resBin.item.pixelSource.inParentSheet &&
-      sheet.pixelSource
-    ) {
+    let img: JimpData | undefined;
+    if (resBin.item.pixelSource !== undefined) {
+      img = pixelSourceToJimp.get(resBin.item.pixelSource);
+    } else if (sheet.pixelSource) {
       img = pixelSourceToJimp.get(sheet.pixelSource);
     }
     if (img === undefined) continue;
     let blitDone = false;
     for (const frameLayer of resBin.item.frameLayers) {
-      const prevSheetBBox = frameLayer.sheetBBox;
-      const newSheetBBox = new BBox();
-      newSheetBBox.copy(prevSheetBBox);
-      newSheetBBox.x = resBin.x + padding;
-      newSheetBBox.y = resBin.y + padding;
-      keyToNewBBox.set(
-        bboxKey(resBin.item.spriteIndex, prevSheetBBox),
-        newSheetBBox
+      const prevSheetPos = frameLayer.sheetPosition;
+      const newSheetPos = new PositionData();
+      newSheetPos.x = resBin.x + padding;
+      newSheetPos.y = resBin.y + padding;
+      spriteFrameKeyToNewPosition.set(
+        spriteLayerFrameKey(
+          resBin.item.spriteIndex,
+          frameLayer.size,
+          prevSheetPos
+        ),
+        newSheetPos
       );
       if (!blitDone) {
         resultImg.blit({
           src: img,
-          srcX: prevSheetBBox.x,
-          srcY: prevSheetBBox.y,
-          srcW: prevSheetBBox.width,
-          srcH: prevSheetBBox.height,
-          x: newSheetBBox.x,
-          y: newSheetBBox.y
+          srcX: prevSheetPos.x,
+          srcY: prevSheetPos.y,
+          srcW: frameLayer.size.width,
+          srcH: frameLayer.size.height,
+          x: newSheetPos.x,
+          y: newSheetPos.y
         });
         blitDone = true;
       }
@@ -144,33 +126,26 @@ export async function packSpriteSheet(
 
   const result = sheet.clone();
   const resultPng = await resultImg.getBuffer("image/png");
+  result.pixelSource = new EmbeddedSpriteSheetData();
+  result.pixelSource.pngData = new Uint8Array(resultPng);
 
   result.sprites.forEach((sprite, spriteIndex) => {
-    for (const frame of sprite.frames.values()) {
-      for (const frameLayer of frame.indexedLayers.values()) {
-        const resultBBox = keyToNewBBox.get(
-          bboxKey(spriteIndex, frameLayer.sheetBBox)
+    for (const frame of sprite.frames) {
+      for (const frameLayer of frame.layers) {
+        const resultPos = spriteFrameKeyToNewPosition.get(
+          spriteLayerFrameKey(
+            spriteIndex,
+            frameLayer.size,
+            frameLayer.sheetPosition
+          )
         );
-        if (resultBBox === undefined)
-          throw new Error(
-            `Missing bbox in result: ${JSON.stringify(
-              {
-                spriteIndex,
-                bbox: frameLayer.sheetBBox
-              },
-              null,
-              2
-            )}`
-          );
-        frameLayer.sheetBBox = resultBBox;
+        if (resultPos === undefined)
+          throw new Error("Missing position in result.");
+        frameLayer.sheetPosition = resultPos;
       }
     }
-    sprite.pixelSource = new ProtoSpritePixelSource();
-    sprite.pixelSource.inParentSheet = true;
+    sprite.pixelSource = undefined;
   });
-
-  result.pixelSource = new ProtoSpritePixelSource();
-  result.pixelSource.pngBytes = new Uint8Array(resultPng);
 
   return result;
 }
