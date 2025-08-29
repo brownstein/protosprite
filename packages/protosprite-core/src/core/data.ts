@@ -415,7 +415,7 @@ export class SpriteSheetData {
 
   clone(deep = false) {
     const other = new SpriteSheetData();
-    other.sprites = other.sprites.map((sprite) => sprite.clone(deep));
+    other.sprites = this.sprites.map((sprite) => sprite.clone(deep));
     other.pixelSource = this.pixelSource?.clone(deep);
     return other;
   }

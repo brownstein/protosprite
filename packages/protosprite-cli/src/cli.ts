@@ -4,7 +4,7 @@ import childProcess from "child_process";
 import fs from "fs";
 import { Jimp } from "jimp";
 import path from "path";
-import { ProtoSpriteSheet } from "protosprite-core";
+import ProtoSprite, { ProtoSpriteInstance, ProtoSpriteSheet } from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
 import {
   packSpriteSheet,
@@ -13,6 +13,7 @@ import {
 import tmpDir from "temp-dir";
 
 import { findAsperiteBinary } from "./util/findAseprite.js";
+import { ExternalSpriteSheetData, isEmbeddedSpriteSheetData, SpriteSheetData } from "../../protosprite-core/dist/src/core/data.js";
 
 const program = new Command()
   .name("protosprite-cli")
@@ -52,7 +53,7 @@ class ProtoSpriteCLI {
     if (this.args.debug)
       console.log(
         "[debug] loaded files:",
-        this.sheet?.sprites.map((sprite) => sprite.name).join(" ")
+        this.sheet?.sprites.map((sprite) => sprite.data.name).join(" ")
       );
 
     // Rename sprites in sheet.
@@ -60,7 +61,7 @@ class ProtoSpriteCLI {
     if (applyNames) {
       this.sheet?.sprites.forEach((s, i) => {
         if (i >= applyNames.length) return;
-        s.name = applyNames[i];
+        s.data.name = applyNames[i];
       });
     }
 
@@ -133,13 +134,14 @@ class ProtoSpriteCLI {
           debug: this.args.debug
         });
         if (this.args.debug) console.log("Imported file:", sprite.name);
-        this.sheet.appendSprite(sprite);
+        this.sheet?.data.sprites.push(sprite);
+        this.sheet?.sprites.push(new ProtoSprite(sprite, this.sheet));
         continue;
       }
 
       // Handle binary ProtoSprite sheet files.
       const rawBuff = fs.readFileSync(inputFile);
-      this.sheet = ProtoSpriteSheet.fromBuffer(rawBuff.buffer);
+      this.sheet = ProtoSpriteSheet.fromArray(new Uint8Array(rawBuff));
     }
   }
   private async _saveFiles() {
@@ -150,19 +152,20 @@ class ProtoSpriteCLI {
       this.args.outputProtoSpriteFileName ||
       this.args.outputSpriteSheetFileName
     ) {
-      if (args.debug) console.log("Packing sprite sheet...");
-      this.sheet = await packSpriteSheet(this.sheet);
+      if (args.debug) console.log("Packing sprite sheet...", this.sheet);
+      this.sheet.data = await packSpriteSheet(this.sheet.data);
+      this.sheet.sprites = this.sheet.data.sprites.map((data) => new ProtoSprite(data, this.sheet));
       if (!this.sheet) throw new Error("Missing sprite sheet after packing.");
 
       // In sheet export mode, remove the embedded buffer.
       if (this.args.outputSpriteSheetFileName) {
-        if (this.sheet?.pixelSource?.pngBytes) {
+        if (isEmbeddedSpriteSheetData(this.sheet.data.pixelSource) && !!this.sheet.data.pixelSource.pngData) {
           const pngFileName = this.args.outputSpriteSheetFileName;
-          fs.writeFileSync(pngFileName, this.sheet.pixelSource.pngBytes, {
+          fs.writeFileSync(pngFileName, this.sheet.data.pixelSource.pngData, {
             encoding: "binary"
           });
-          this.sheet.pixelSource.fileName = pngFileName;
-          this.sheet.pixelSource.pngBytes = undefined;
+          this.sheet.data.pixelSource = new ExternalSpriteSheetData();
+          this.sheet.data.pixelSource.fileName = pngFileName;
         }
       }
 
@@ -173,7 +176,7 @@ class ProtoSpriteCLI {
             encoding: "utf8"
           });
         } else {
-          const binBuff = this.sheet?.toBinary();
+          const binBuff = this.sheet.toArray();
           fs.writeFileSync(this.args.outputProtoSpriteFileName, binBuff, {
             encoding: "binary"
           });
@@ -188,8 +191,8 @@ class ProtoSpriteCLI {
       let totalWidth = 0;
       let totalHeight = 0;
       for (const sprite of this.sheet.sprites) {
-        totalWidth += sprite.center.x * 2;
-        totalHeight = Math.max(totalHeight, sprite.center.y * 2);
+        totalWidth += sprite.data.size.width;
+        totalHeight = Math.max(totalHeight, sprite.data.size.height);
       }
       const outputImg = new Jimp({
         width: totalWidth,
@@ -199,7 +202,7 @@ class ProtoSpriteCLI {
       for (const sprite of this.sheet.sprites) {
         const yOffset = 0;
         const renderedSpriteImg = await renderSpriteInstance(
-          sprite.createInstance(),
+          new ProtoSpriteInstance(sprite),
           {
             debug: this.args.debug
           }
@@ -213,7 +216,7 @@ class ProtoSpriteCLI {
           srcW: renderedSpriteImg.width,
           srcH: renderedSpriteImg.height
         });
-        xOffset += sprite.center.x * 2;
+        xOffset += sprite.data.size.width;
       }
       await outputImg.write(
         this.args.outputRenderedFileName as "string.string"

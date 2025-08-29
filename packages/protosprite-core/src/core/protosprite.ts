@@ -1,4 +1,4 @@
-import { fromBinary, toBinary } from "@bufbuild/protobuf";
+import { fromBinary, toBinary, toJson } from "@bufbuild/protobuf";
 import { SpriteSheetSchema } from "proto_dist/sprite_pb.js";
 
 import { SpriteData, SpriteSheetData } from "./data.js";
@@ -27,6 +27,11 @@ export class ProtoSpriteSheet {
   toArray() {
     const proto = this.data.toProto();
     return toBinary(SpriteSheetSchema, proto);
+  }
+
+  toJsonObject() {
+    const proto = this.data.toProto();
+    return toJson(SpriteSheetSchema, proto);
   }
 }
 
