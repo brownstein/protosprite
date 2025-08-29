@@ -1,17 +1,16 @@
 import { fromBinary } from "@bufbuild/protobuf";
 import EventEmitter from "events";
 import {
+  Data,
+  ProtoSprite,
   ProtoSpriteInstance,
-  ProtoSpriteLayer,
-  ProtoSpriteSheet,
-  Vector
+  ProtoSpriteSheet
 } from "protosprite-core";
 import {
   BufferAttribute,
   BufferGeometry,
   Color,
   Mesh,
-  MeshBasicMaterial,
   NearestFilter,
   ShaderMaterial,
   Texture,
@@ -20,6 +19,7 @@ import {
   Vector4
 } from "three";
 
+import { LayerData } from "../../protosprite-core/dist/src/core/data.js";
 import fragmentShader from "./shader.frag";
 import vertexShader from "./shader.vert";
 
@@ -84,25 +84,25 @@ export class ProtoSpriteSheetThreeLoader {
         throw new Error("Unable to fetch referenced sprite binary.");
       }
       const rawBuff = await rawRes.arrayBuffer();
-      const sheet = ProtoSpriteSheet.fromBuffer(rawBuff);
+      const sheet = ProtoSpriteSheet.fromArray(new Uint8Array(rawBuff));
       state.sheet = sheet;
     }
     if (state.sheet) {
       state.resource = new ProtoSpriteSheetThree(state.sheet);
-      const sheetTextureUrl =
-        state.sheet.pixelSource?.url ?? state.sheet.pixelSource?.fileName;
-      const sheetPngBytes = state.sheet.pixelSource?.pngBytes;
-      if (sheetPngBytes) {
-        state.resource.sheetTexture = await this.textureLoader.loadAsync(
-          URL.createObjectURL(
-            new Blob([new Uint8Array(sheetPngBytes)], {
-              type: "image/png"
-            })
-          )
-        );
-        state.resource.sheetTexture.minFilter = NearestFilter;
-        state.resource.sheetTexture.magFilter = NearestFilter;
-      } else if (sheetTextureUrl && sheetTextureUrl !== "") {
+      let sheetTextureUrl: string | undefined;
+      if (Data.isExternalSpriteSheetData(state.sheet.data.pixelSource)) {
+        sheetTextureUrl =
+          state.sheet.data.pixelSource.url ??
+          state.sheet.data.pixelSource.fileName;
+      } else if (Data.isEmbeddedSpriteSheetData(state.sheet.data.pixelSource)) {
+        const pngData = state.sheet.data.pixelSource.pngData;
+        if (pngData) {
+          sheetTextureUrl = URL.createObjectURL(
+            new Blob([new Uint8Array(pngData)], { type: "image/png " })
+          );
+        }
+      }
+      if (sheetTextureUrl !== undefined) {
         state.resource.sheetTexture =
           await this.textureLoader.loadAsync(sheetTextureUrl);
         state.resource.sheetTexture.minFilter = NearestFilter;
@@ -111,28 +111,25 @@ export class ProtoSpriteSheetThreeLoader {
       const pendingWork = state.sheet.sprites.map(
         async (sprite, spriteIndex) => {
           if (!state.resource) return;
-          const spriteTextureUrl =
-            sprite.pixelSource?.url ?? sprite.pixelSource?.fileName;
-          const spritePngBytes = sprite.pixelSource?.pngBytes;
-          let spriteTexture;
-          if (spritePngBytes) {
-            spriteTexture = await this.textureLoader.loadAsync(
-              URL.createObjectURL(
-                new Blob([new Uint8Array(spritePngBytes)], {
-                  type: "image/png"
-                })
-              )
-            );
-          } else if (spriteTextureUrl && spriteTextureUrl !== "") {
-            spriteTexture =
-              await this.textureLoader.loadAsync(spriteTextureUrl);
+          let spriteTextureUrl: string | undefined;
+          if (Data.isExternalSpriteSheetData(sprite.data.pixelSource)) {
+            spriteTextureUrl =
+              sprite.data.pixelSource.url ?? sprite.data.pixelSource.fileName;
+          } else if (Data.isEmbeddedSpriteSheetData(sprite.data.pixelSource)) {
+            const pngData = sprite.data.pixelSource.pngData;
+            if (pngData) {
+              spriteTextureUrl = URL.createObjectURL(
+                new Blob([new Uint8Array(pngData)], { type: "image/png " })
+              );
+            }
           }
-          if (!spriteTexture) return;
-          spriteTexture.minFilter = NearestFilter;
-          spriteTexture.magFilter = NearestFilter;
-          if (state.resource.individualTextures === undefined)
-            state.resource.individualTextures = new Map();
-          state.resource.individualTextures.set(spriteIndex, spriteTexture);
+          if (spriteTextureUrl !== undefined) {
+            const spriteTexture =
+              await this.textureLoader.loadAsync(spriteTextureUrl);
+            spriteTexture.minFilter = NearestFilter;
+            spriteTexture.magFilter = NearestFilter;
+            state.resource.individualTextures?.set(spriteIndex, spriteTexture);
+          }
         }
       );
       await Promise.all(pendingWork);
@@ -167,7 +164,8 @@ export class ProtoSpriteSheetThree {
       sheetIndex++
     ) {
       const sprite = this.sheet.sprites[sheetIndex];
-      if (sprite.name === indexOrName) return this._createSprite(sheetIndex);
+      if (sprite.data.name === indexOrName)
+        return this._createSprite(sheetIndex);
     }
     throw new Error(`Sprite ${indexOrName} not found in sheet.`);
   }
@@ -175,7 +173,7 @@ export class ProtoSpriteSheetThree {
   private _createSprite(spriteIndex: number) {
     const sourceSprite = this.sheet.sprites.at(spriteIndex);
     if (!sourceSprite) throw new Error("Source sprite not found.");
-    const protoSpriteInstance = sourceSprite.createInstance();
+    const protoSpriteInstance = new ProtoSpriteInstance(sourceSprite);
     const texture =
       this.individualTextures?.get(spriteIndex) ?? this.sheetTexture;
     if (texture === undefined)
@@ -251,7 +249,7 @@ export class ProtoSpriteThree {
     const mesh = new Mesh(geom, material);
     this.mesh = mesh;
 
-    const layerCount = this.protoSpriteInstance.data.layers.length;
+    const layerCount = this.protoSpriteInstance.sprite.countLayers();
     this.mainLayer = {
       geom,
       material,
@@ -356,29 +354,40 @@ export class ProtoSpriteThree {
     let yMax = 0;
 
     let drawIndex = 0;
-    this.protoSpriteInstance.forEachLayerOfCurrentFrame((layerFrame) => {
-      const layer = layerFrame.layer;
-      if (layer === undefined) return;
-
-      let group: ProtoSpriteLayer | undefined = layer;
-      while (group !== undefined) {
-        if (this.hiddenLayerNames.has(group.name ?? "*")) return;
-        group = group.parent;
+    const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
+    const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
+    if (frame === undefined) return;
+    for (const layerFrame of frame.layers) {
+      const layer = this.protoSpriteInstance.sprite.data.layers.at(
+        layerFrame.layerIndex
+      );
+      if (layer === undefined || layer.isGroup) continue;
+      let groupLayerIndex = layer.parentIndex;
+      let groupHidden = false;
+      while (groupLayerIndex !== undefined) {
+        const groupLayer =
+          this.protoSpriteInstance.sprite.data.layers.at(groupLayerIndex);
+        if (groupLayer === undefined) break;
+        if (this.hiddenLayerNames.has(groupLayer.name)) {
+          groupHidden = true;
+          break;
+        }
+        groupLayerIndex = groupLayer.parentIndex;
       }
+      if (groupHidden) continue;
 
-      const spriteBBox = layerFrame.spriteBBox;
-      const srcBBox = layerFrame.sheetBBox;
-      const z = layer.index ?? 0;
+      const { size, sheetPosition, spritePosition } = layerFrame;
+      const z = layer.index;
 
       const i = drawIndex++;
 
       const vi = i * 12;
       const uvi = i * 8;
 
-      const x0 = ox + spriteBBox.x;
-      const x1 = x0 + spriteBBox.width;
-      const y0 = oy + spriteBBox.y;
-      const y1 = y0 + spriteBBox.height;
+      const x0 = ox + spritePosition.x;
+      const x1 = x0 + size.width;
+      const y0 = oy + spritePosition.y;
+      const y1 = y0 + size.height;
 
       if (x0 < xMin) xMin = x0;
       if (x1 > xMax) xMax = x1;
@@ -398,10 +407,10 @@ export class ProtoSpriteThree {
       posArr[vi + 10] = y1;
       posArr[vi + 11] = z;
 
-      const u0 = invWidth * srcBBox.x;
-      const u1 = invWidth * (srcBBox.x + srcBBox.width);
-      const v0 = 1 - invHeight * srcBBox.y;
-      const v1 = 1 - invHeight * (srcBBox.y + srcBBox.height);
+      const u0 = invWidth * sheetPosition.x;
+      const u1 = invWidth * (sheetPosition.x + size.width);
+      const v0 = 1 - invHeight * sheetPosition.y;
+      const v1 = 1 - invHeight * (sheetPosition.y + size.height);
 
       uvArr[uvi + 0] = u0;
       uvArr[uvi + 1] = v0;
@@ -411,7 +420,7 @@ export class ProtoSpriteThree {
       uvArr[uvi + 5] = v1;
       uvArr[uvi + 6] = u0;
       uvArr[uvi + 7] = v1;
-    });
+    }
 
     geom.getAttribute("position").needsUpdate = true;
     geom.getAttribute("uv").needsUpdate = true;
@@ -424,7 +433,7 @@ export class ProtoSpriteThree {
       geom.boundingSphere.center.set(
         (xMin + xMax) * 0.5,
         (yMin + yMax) * 0.5,
-        this.protoSpriteInstance.data.layers.length * 0.5
+        drawIndex * 0.5
       );
       geom.boundingSphere.radius = Math.max(xMax - xMin, yMax - yMin) * 0.5;
       geom.boundingBox.min.x = xMin;
@@ -445,15 +454,27 @@ export class ProtoSpriteThree {
     } = this.mainLayer;
 
     let drawIndex = 0;
-    this.protoSpriteInstance.forEachLayerOfCurrentFrame((layerFrame) => {
-      const layer = layerFrame.layer;
-      if (layer === undefined) return;
-
-      let group: ProtoSpriteLayer | undefined = layer;
-      while (group !== undefined) {
-        if (this.hiddenLayerNames.has(group.name ?? "*")) return;
-        group = group.parent;
+    const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
+    const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
+    if (frame === undefined) return;
+    for (const layerFrame of frame.layers) {
+      const layer = this.protoSpriteInstance.sprite.data.layers.at(
+        layerFrame.layerIndex
+      );
+      if (layer === undefined || layer.isGroup) continue;
+      let groupLayerIndex = layer.parentIndex;
+      let groupHidden = false;
+      while (groupLayerIndex !== undefined) {
+        const groupLayer =
+          this.protoSpriteInstance.sprite.data.layers.at(groupLayerIndex);
+        if (groupLayer === undefined) break;
+        if (this.hiddenLayerNames.has(groupLayer.name)) {
+          groupHidden = true;
+          break;
+        }
+        groupLayerIndex = groupLayer.parentIndex;
       }
+      if (groupHidden) continue;
 
       const i = drawIndex++;
       const i4 = i * 4;
@@ -505,7 +526,7 @@ export class ProtoSpriteThree {
       } else {
         outlineThicknessArr.fill(0, i4, i4 + 4);
       }
-    });
+    }
 
     geom.getAttribute("vtxOpacity").needsUpdate = true;
     geom.getAttribute("vtxMultColor").needsUpdate = true;
@@ -515,14 +536,14 @@ export class ProtoSpriteThree {
   }
 
   advance(ms: number) {
-    this.positionDirty ||= this.protoSpriteInstance.advanceByDuration(ms);
+    this.positionDirty ||= this.protoSpriteInstance.animationState.advance(ms);
     return this;
   }
 
   gotoAnimation(animationName: string | null) {
-    const swapped = this.protoSpriteInstance.switchToAnimation(animationName);
-    this.positionDirty ||= swapped ?? false;
-    return swapped;
+    this.positionDirty ||=
+      this.protoSpriteInstance.animationState.startAnimation(animationName);
+    return this;
   }
 
   hideLayers(...layerNames: string[]) {
@@ -538,32 +559,34 @@ export class ProtoSpriteThree {
   }
 
   center() {
-    const currFrame = this.protoSpriteInstance.data.frame(
-      this.protoSpriteInstance.currentFrame
+    const currFrame = this.protoSpriteInstance.sprite.maps.frameMap.get(
+      this.protoSpriteInstance.animationState.currentFrame
     );
     if (currFrame === undefined) return false;
     let xMin = -1;
     let xMax = -1;
     let yMin = -1;
     let yMax = -1;
-    for (const layerFrame of currFrame.indexedLayers.values()) {
-      const layer = layerFrame.layer;
+    for (const layerFrame of currFrame.layers) {
+      const layer = this.protoSpriteInstance.sprite.maps.layerMap.get(
+        layerFrame.layerIndex
+      );
       if (layer === undefined) continue;
       if (this.hiddenLayerNames.has(layer.name ?? "*")) continue;
-      if (xMin === -1 || xMin > layerFrame.spriteBBox.x)
-        xMin = layerFrame.spriteBBox.x;
-      if (yMin === -1 || yMin > layerFrame.spriteBBox.y)
-        yMin = layerFrame.spriteBBox.y;
+      if (xMin === -1 || xMin > layerFrame.spritePosition.x)
+        xMin = layerFrame.spritePosition.x;
+      if (yMin === -1 || yMin > layerFrame.spritePosition.y)
+        yMin = layerFrame.spritePosition.y;
       if (
         xMax === -1 ||
-        xMax < layerFrame.spriteBBox.x + layerFrame.spriteBBox.width - 1
+        xMax < layerFrame.spritePosition.x + layerFrame.size.width - 1
       )
-        xMax = layerFrame.spriteBBox.x + layerFrame.spriteBBox.width - 1;
+        xMax = layerFrame.spritePosition.x + layerFrame.size.width - 1;
       if (
         yMax === -1 ||
-        yMax < layerFrame.spriteBBox.y + layerFrame.spriteBBox.height - 1
+        yMax < layerFrame.spritePosition.y + layerFrame.size.height - 1
       )
-        yMax = layerFrame.spriteBBox.y + layerFrame.spriteBBox.height - 1;
+        yMax = layerFrame.spritePosition.y + layerFrame.size.height - 1;
     }
     if (xMin !== -1) {
       this.offset
@@ -576,6 +599,32 @@ export class ProtoSpriteThree {
     return true;
   }
 
+  private expandLayerGroups(layerNames: Iterable<string>) {
+    const dataMap = this.protoSpriteInstance.sprite.maps;
+    const expandedLayerNames = new Set<string>();
+    const groupIndexStack: number[] = [];
+    for (const layerName of layerNames) {
+      const layer = dataMap.layerNameMap.get(layerName);
+      if (layer === undefined) continue;
+      if (layer.isGroup) {
+        groupIndexStack.push(layer.index);
+      } else {
+        expandedLayerNames.add(layerName);
+      }
+    }
+    while (groupIndexStack.length > 0) {
+      const nextIndex = groupIndexStack.pop();
+      if (nextIndex === undefined) break;
+      const layer = dataMap.layerMap.get(nextIndex);
+      if (layer === undefined) continue;
+      expandedLayerNames.add(layer.name);
+      for (const subLayer of dataMap.layerGroupsDown.get(nextIndex) ?? []) {
+        groupIndexStack.push(subLayer.index);
+      }
+    }
+    return expandedLayerNames;
+  }
+
   setOpacity(opacity: number) {
     this.mainLayer.material.uniforms.opacity.value = opacity;
     this.mainLayer.material.uniformsNeedUpdate = true;
@@ -583,33 +632,21 @@ export class ProtoSpriteThree {
   }
 
   setLayerOpacity(opacity: number, layers: Iterable<string>) {
-    const layerWhitelist = new Set(layers);
-    const expandGroup = (layer: ProtoSpriteLayer) => {
-      if (layer.name === undefined) return;
-      layerWhitelist.add(layer.name);
-      layer.children.forEach(expandGroup);
-    };
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      expandGroup(layer);
-    }
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      let overrides = this.layerOverrides.get(layer.name);
+    for (const layerName of this.expandLayerGroups(layers)) {
+      let overrides = this.layerOverrides.get(layerName);
       if (overrides === undefined) {
         overrides = {};
-        this.layerOverrides.set(layer.name, overrides);
+        this.layerOverrides.set(layerName, overrides);
       }
       overrides.opacity = opacity;
     }
     this.extraDirty = true;
+    return this;
   }
 
   fadeAllLayers(color: Color, opacity: number = 1) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
-    for (const layer of this.data.data.layers) {
+    for (const layer of this.data.sprite.data.layers) {
       if (layer.name === undefined) continue;
       let overrides = this.layerOverrides.get(layer.name);
       if (overrides === undefined) {
@@ -623,25 +660,12 @@ export class ProtoSpriteThree {
   }
 
   fadeLayers(color: Color, opacity: number, layers: Iterable<string>) {
-    const layerWhitelist = new Set(layers);
-    const expandGroup = (layer: ProtoSpriteLayer) => {
-      if (layer.name === undefined) return;
-      layerWhitelist.add(layer.name);
-      layer.children.forEach(expandGroup);
-    };
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      expandGroup(layer);
-    }
     const fade = new Vector4(color.r, color.g, color.b, opacity);
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      let overrides = this.layerOverrides.get(layer.name);
+    for (const layerName of this.expandLayerGroups(layers)) {
+      let overrides = this.layerOverrides.get(layerName);
       if (overrides === undefined) {
         overrides = {};
-        this.layerOverrides.set(layer.name, overrides);
+        this.layerOverrides.set(layerName, overrides);
       }
       overrides.fade = fade;
     }
@@ -651,8 +675,7 @@ export class ProtoSpriteThree {
 
   multiplyAllLayers(color: Color, opacity: number = 1) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
+    for (const layer of this.data.sprite.data.layers) {
       let overrides = this.layerOverrides.get(layer.name);
       if (overrides === undefined) {
         overrides = {};
@@ -665,25 +688,12 @@ export class ProtoSpriteThree {
   }
 
   multiplyLayers(color: Color, opacity: number, layers: Iterable<string>) {
-    const layerWhitelist = new Set(layers);
     const fade = new Vector4(color.r, color.g, color.b, opacity);
-    const expandGroup = (layer: ProtoSpriteLayer) => {
-      if (layer.name === undefined) return;
-      layerWhitelist.add(layer.name);
-      layer.children.forEach(expandGroup);
-    };
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      expandGroup(layer);
-    }
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      let overrides = this.layerOverrides.get(layer.name);
+    for (const layerName of this.expandLayerGroups(layers)) {
+      let overrides = this.layerOverrides.get(layerName);
       if (overrides === undefined) {
         overrides = {};
-        this.layerOverrides.set(layer.name, overrides);
+        this.layerOverrides.set(layerName, overrides);
       }
       overrides.color = fade;
     }
@@ -692,7 +702,7 @@ export class ProtoSpriteThree {
   }
 
   outlineAllLayers(thickness: number, color: Color, opacity: number = 1) {
-    for (const layer of this.data.data.layers) {
+    for (const layer of this.data.sprite.data.layers) {
       if (layer.name === undefined) continue;
       let overrides = this.layerOverrides.get(layer.name);
       if (overrides === undefined) {
@@ -712,27 +722,15 @@ export class ProtoSpriteThree {
     opacity: number,
     layers: Iterable<string>
   ) {
-    const layerWhitelist = new Set(layers);
-    const expandGroup = (layer: ProtoSpriteLayer) => {
-      if (layer.name === undefined) return;
-      layerWhitelist.add(layer.name);
-      layer.children.forEach(expandGroup);
-    };
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      expandGroup(layer);
-    }
-    for (const layer of this.data.data.layers) {
-      if (layer.name === undefined) continue;
-      if (!layerWhitelist.has(layer.name)) continue;
-      let overrides = this.layerOverrides.get(layer.name);
+    const outline = new Vector4(color.r, color.g, color.b, opacity);
+    for (const layerName of this.expandLayerGroups(layers)) {
+      let overrides = this.layerOverrides.get(layerName);
       if (overrides === undefined) {
         overrides = {};
-        this.layerOverrides.set(layer.name, overrides);
+        this.layerOverrides.set(layerName, overrides);
       }
+      overrides.outline = outline;
       overrides.outlineThickness = thickness;
-      overrides.outline = new Vector4(color.r, color.g, color.b, opacity);
     }
     this.extraDirty = true;
     return this;
@@ -746,8 +744,8 @@ export class ProtoSpriteThree {
 
   get size() {
     return new Vector2(
-      this.protoSpriteInstance.data.center.x * 2,
-      this.protoSpriteInstance.data.center.y * 2
+      this.protoSpriteInstance.sprite.data.size.width,
+      this.protoSpriteInstance.sprite.data.size.height
     );
   }
 

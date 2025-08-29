@@ -34,6 +34,7 @@ export class ProtoSpriteDataMap {
   public data: SpriteData;
   public frameMap = new Map<number, FrameData>();
   public layerMap = new Map<number, LayerData>();
+  public layerNameMap = new Map<string, LayerData>();
   public animationMap = new Map<string, AnimationData>();
 
   public layerGroupSet = new Set<number>();
@@ -51,6 +52,7 @@ export class ProtoSpriteDataMap {
   remap() {
     this.frameMap.clear();
     this.layerMap.clear();
+    this.layerNameMap.clear();
     this.animationMap.clear();
 
     for (const frame of this.data.frames) {
@@ -58,6 +60,7 @@ export class ProtoSpriteDataMap {
     }
     for (const layer of this.data.layers) {
       this.layerMap.set(layer.index, layer);
+      this.layerNameMap.set(layer.name, layer);
     }
     for (const animation of this.data.animations) {
       this.animationMap.set(animation.name, animation);
@@ -86,7 +89,10 @@ export class ProtoSpriteDataMap {
 }
 
 export type ProtoSpriteAnimationEventTypes = {
-  FrameSwapped: [number, number]
+  FrameSwapped: {
+    from: number,
+    to: number
+  };
   LoopComplete: void,
 };
 
@@ -103,8 +109,72 @@ export class ProtoSpriteInstanceAnimationState {
   constructor(dataMap: ProtoSpriteDataMap) {
     this.dataMap = dataMap;
     if (dataMap.data.frames.length > 0) {
-      const firstFrame = dataMap.data.frames.at(0);
+      const firstFrame = dataMap.data.frames.at(this.currentFrame);
       if (firstFrame === undefined) throw new Error("No frames available.");
+      this.currentFrameDurationRemaining = firstFrame.duration;
     }
+  }
+
+  startAnimation(animationName: string | null) {
+    let changedAnimation = false;
+    let nextAnimation: AnimationData | undefined;
+    if (animationName !== null) {
+      const animation = this.dataMap.animationMap.get(animationName);
+      if (animation !== undefined && animation !== this.currentAnimation) {
+
+      } 
+    }
+    changedAnimation = nextAnimation !== this.currentAnimation;
+    this.currentAnimation = nextAnimation;
+    if (changedAnimation) {
+      if (this.currentAnimation) {
+        if (this.speed >= 0) {
+          this.currentFrame = this.currentAnimation.indexStart;
+        } else {
+          this.currentFrame = this.currentAnimation.indexEnd;
+        }
+        const frame = this.dataMap.frameMap.get(this.currentFrame);
+        this.currentFrameDurationRemaining = frame?.duration ?? 100;
+      }
+    }
+    return changedAnimation;
+  }
+
+  advance(duration: number) {
+    if (this.speed === 0) return false;
+    this.currentFrameDurationRemaining -= duration * Math.abs(this.speed);
+    let changedFrame = false;
+    while (this.currentFrameDurationRemaining <= 0) {
+      changedFrame = true;
+      if (this.speed > 0) {
+        this.currentFrame++;
+        if (this.currentAnimation) {
+          if (this.currentFrame > this.currentAnimation.indexEnd) {
+            this.currentFrame = this.currentAnimation.indexStart;
+          }
+        } else {
+          if (this.currentFrame >= this.dataMap.frameMap.size) {
+            this.currentFrame = 0;
+          }
+        }
+      } else {
+        this.currentFrame--;
+        if (this.currentAnimation) {
+          if (this.currentFrame < this.currentAnimation.indexStart) {
+            this.currentFrame = this.currentAnimation.indexEnd;
+          }
+        } else {
+          if (this.currentFrame <= 0) {
+            this.currentFrame = this.dataMap.frameMap.size - 1;
+          }
+        }
+      }
+
+      const frame = this.dataMap.frameMap.get(this.currentFrame);
+      if (frame === undefined) throw new Error(`Unable to find frame ${this.currentFrame}`);
+      this.currentFrameDurationRemaining += frame.duration;
+    }
+
+    return changedFrame;
   }
 }
