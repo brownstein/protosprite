@@ -1,8 +1,4 @@
-import {
-  Data,
-  ProtoSpriteInstance,
-  ProtoSpriteSheet
-} from "protosprite-core";
+import { Data, ProtoSpriteInstance, ProtoSpriteSheet } from "protosprite-core";
 import {
   BufferAttribute,
   BufferGeometry,
@@ -16,7 +12,10 @@ import {
   Vector4
 } from "three";
 
-import { LayerData } from "../../protosprite-core/dist/src/core/data.js";
+import {
+  FrameData,
+  LayerData
+} from "../../protosprite-core/dist/src/core/data.js";
 import fragmentShader from "./shader.frag";
 import vertexShader from "./shader.vert";
 
@@ -252,10 +251,16 @@ export class ProtoSpriteThree {
   private hiddenLayerNames = new Set<string>();
   private layerOverrides = new Map<string, ProtoSpriteLayerThreeOverride>();
 
-  constructor(protoSpriteInstance: ProtoSpriteInstance, material: ShaderMaterial) {
+  constructor(
+    protoSpriteInstance: ProtoSpriteInstance,
+    material: ShaderMaterial
+  ) {
     this.protoSpriteInstance = protoSpriteInstance;
-    const texture = (material.uniforms.map.value as Texture);
-    this.textureSize = new Vector2(texture.image.naturalWidth, texture.image.naturalHeight);
+    const texture = material.uniforms.map.value as Texture;
+    this.textureSize = new Vector2(
+      texture.image.naturalWidth,
+      texture.image.naturalHeight
+    );
 
     const geom = new BufferGeometry();
 
@@ -554,7 +559,8 @@ export class ProtoSpriteThree {
   }
 
   gotoAnimation(animationName: string | null) {
-    const swapped = this.protoSpriteInstance.animationState.startAnimation(animationName);
+    const swapped =
+      this.protoSpriteInstance.animationState.startAnimation(animationName);
     this.positionDirty ||= swapped;
     return this;
   }
@@ -572,9 +578,15 @@ export class ProtoSpriteThree {
   }
 
   center() {
-    const currFrame = this.protoSpriteInstance.sprite.maps.frameMap.get(
-      this.protoSpriteInstance.animationState.currentFrame
-    );
+    let frame = this.protoSpriteInstance.animationState.currentFrame;
+    let currFrame: FrameData | undefined;
+    let it = 0;
+    while (currFrame === undefined && it++ < 512) {
+      currFrame = this.protoSpriteInstance.sprite.maps.frameMap.get(frame);
+      if (currFrame === undefined)
+        frame =
+          (frame + 1) & this.protoSpriteInstance.sprite.data.frames.length;
+    }
     if (currFrame === undefined) return false;
     let xMin = -1;
     let xMax = -1;
@@ -605,6 +617,13 @@ export class ProtoSpriteThree {
       this.offset
         .set(xMin + xMax, yMin + yMax)
         .multiplyScalar(-1 / 2)
+        .round();
+    } else {
+      this.offset
+        .set(
+          this.protoSpriteInstance.sprite.data.size.width * -0.5,
+          this.protoSpriteInstance.sprite.data.size.height * -0.5
+        )
         .round();
     }
     this.positionDirty = true;

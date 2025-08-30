@@ -335,6 +335,7 @@ export class SpriteData {
         break;
     }
     instance.frames = proto.frames.map(FrameData.fromProto);
+    // FIXME.
     instance.layers = proto.layers.map(LayerData.fromProto);
     // FIXME.
     instance.layers.forEach((layer, layerIndex) => layer.index = layerIndex);

@@ -170,8 +170,7 @@ export class ProtoSpriteInstanceAnimationState {
         }
       }
 
-      const frame = this.dataMap.frameMap.get(this.currentFrame);
-      if (frame === undefined) throw new Error(`Unable to find frame ${this.currentFrame}`);
+      const frame = this.dataMap.frameMap.get(this.currentFrame) ?? new FrameData();
       this.currentFrameDurationRemaining += frame.duration;
     }
 
