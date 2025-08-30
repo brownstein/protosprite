@@ -554,8 +554,8 @@ export class ProtoSpriteThree {
   }
 
   gotoAnimation(animationName: string | null) {
-    this.positionDirty ||=
-      this.protoSpriteInstance.animationState.startAnimation(animationName);
+    const swapped = this.protoSpriteInstance.animationState.startAnimation(animationName);
+    this.positionDirty ||= swapped;
     return this;
   }
 

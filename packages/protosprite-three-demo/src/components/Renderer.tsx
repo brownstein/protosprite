@@ -41,6 +41,7 @@ export function Renderer(props: RendererProps) {
 
       const sceneBBox = new Box3();
       sceneBBox.expandByObject(scene);
+      sceneBBox.expandByScalar(16);
       const sceneCenter = new Vector3();
       const sceneSize = new Vector3();
       sceneBBox.getCenter(sceneCenter);
@@ -79,13 +80,14 @@ export function Renderer(props: RendererProps) {
 
         const sceneBBox = new Box3();
         sceneBBox.expandByObject(scene);
+        sceneBBox.expandByScalar(16);
         const sceneCenter = new Vector3();
         const sceneSize = new Vector3();
         sceneBBox.getCenter(sceneCenter);
         sceneBBox.getSize(sceneSize);
 
-        const r = Math.min(0, (1000 - delta) * 0.001);
-        const r2 = 0.0001 * delta;
+        const r = Math.min(0, (1000 - delta) * 0.002);
+        const r2 = 0.00005 * delta;
         const cameraAcceleration = new Vector2(sceneCenter.x, sceneCenter.y).sub(cameraCenter)
           .multiplyScalar(r2);
         cameraVelocity.multiplyScalar(r).add(cameraAcceleration);
@@ -93,7 +95,11 @@ export function Renderer(props: RendererProps) {
           .multiplyScalar(r2);
         cameraSizeVelocity.multiplyScalar(r).add(cameraSizeAcceleration);
 
-        const canvasSize = canvas.getBoundingClientRect();
+        const canvasSizeRect = canvas.getBoundingClientRect();
+        const canvasSize = {
+          width: Math.floor(canvasSizeRect.width),
+          height: Math.floor(canvasSizeRect.height)
+        };
         const camSize = sizeCameraToCanvas(cameraSize, canvasSize);
 
         camera.position.x = cameraCenter.x;

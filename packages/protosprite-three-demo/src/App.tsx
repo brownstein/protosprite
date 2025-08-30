@@ -9,7 +9,7 @@ import {
 } from "three";
 
 import "./App.css";
-import protagSprite from "./protag.prs";
+import protagSprite from "./protag2.prs";
 import { Renderer } from "./components/Renderer";
 
 function App() {
@@ -20,13 +20,24 @@ function App() {
     const doTheThing = async () => {
       const loader = new ProtoSpriteSheetThreeLoader();
       const sheet = await loader.loadAsync(protagSprite);
-      const sprite = sheet.getSprite();
-      sprite.gotoAnimation("idle");
-      sprite.center();
-      sprite.mesh.scale.y = -1;
-      sprite.fadeAllLayers(new Color(0xffcc00), 0.5);
-      sprite.outlineAllLayers(1, new Color(0xff0000));
-      setSprites([sprite]);
+      const sprites: ProtoSpriteThree[] = [];
+
+      for (let x = 0; x < 20; x++) {
+        for (let y = 0; y < 20; y++) {
+          const sprite = sheet.getSprite();
+          sprite.gotoAnimation("idle");
+          sprite.data.animationState.speed = Math.random() + 0.5;
+          sprite.center();
+          sprite.mesh.scale.y = -1;
+          sprite.mesh.position.x = x * 10;
+          sprite.mesh.position.y = y * 10;
+          sprite.hideLayers("Engine");
+          sprite.fadeLayers(new Color(0xffaa00), 1, ["sword_test"]);
+          sprites.push(sprite);
+        }
+      }
+
+      setSprites(sprites);
     };
     doTheThing();
   }, []);
