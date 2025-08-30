@@ -1,8 +1,5 @@
-import { fromBinary } from "@bufbuild/protobuf";
-import EventEmitter from "events";
 import {
   Data,
-  ProtoSprite,
   ProtoSpriteInstance,
   ProtoSpriteSheet
 } from "protosprite-core";
@@ -134,6 +131,7 @@ export class ProtoSpriteSheetThreeLoader {
       );
       await Promise.all(pendingWork);
       state.resource.loaded = true;
+      state.resource._genMaterials();
       return state.resource;
     }
 
@@ -151,7 +149,10 @@ export class ProtoSpriteSheetThree {
   public sheet: ProtoSpriteSheet;
   public sheetTexture?: Texture;
   public individualTextures?: Map<number, Texture>;
+  public sheetMaterial?: ShaderMaterial;
+  public individualMaterials?: Map<number, ShaderMaterial>;
   public loaded = false;
+  public materialsGenerated = false;
   constructor(sheet: ProtoSpriteSheet) {
     this.sheet = sheet;
   }
@@ -169,16 +170,48 @@ export class ProtoSpriteSheetThree {
     }
     throw new Error(`Sprite ${indexOrName} not found in sheet.`);
   }
-
+  _genMaterials() {
+    if (this.materialsGenerated) return;
+    this.materialsGenerated = true;
+    if (this.sheetTexture) {
+      this.sheetMaterial = this._makeMaterial(this.sheetTexture);
+    }
+    if (this.individualTextures !== undefined) {
+      this.individualMaterials = new Map(
+        [...(this.individualTextures ?? [])].map(([key, texture]) => [
+          key,
+          this._makeMaterial(texture)
+        ])
+      );
+    }
+  }
+  private _makeMaterial(texture: Texture) {
+    return new ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      transparent: true,
+      uniforms: {
+        map: {
+          value: texture
+        },
+        invSheetSize: {
+          value: new Vector2(
+            1 / texture.image.naturalWidth,
+            1 / texture.image.naturalHeight
+          )
+        }
+      }
+    });
+  }
   private _createSprite(spriteIndex: number) {
     const sourceSprite = this.sheet.sprites.at(spriteIndex);
     if (!sourceSprite) throw new Error("Source sprite not found.");
     const protoSpriteInstance = new ProtoSpriteInstance(sourceSprite);
-    const texture =
-      this.individualTextures?.get(spriteIndex) ?? this.sheetTexture;
-    if (texture === undefined)
-      throw new Error("Unable to resolve texture for sprite.");
-    return new ProtoSpriteThree(protoSpriteInstance, texture);
+    const material =
+      this.individualMaterials?.get(spriteIndex) ?? this.sheetMaterial;
+    if (material === undefined)
+      throw new Error("Unable to resolve material for sprite.");
+    return new ProtoSpriteThree(protoSpriteInstance, material);
   }
 }
 
@@ -210,7 +243,6 @@ export class ProtoSpriteThree {
   public mesh: Mesh;
 
   private protoSpriteInstance: ProtoSpriteInstance;
-  private texture: Texture;
   private textureSize: Vector2;
   private mainLayer: ProtoSpriteThreeLayer;
   private positionDirty = true;
@@ -220,31 +252,12 @@ export class ProtoSpriteThree {
   private hiddenLayerNames = new Set<string>();
   private layerOverrides = new Map<string, ProtoSpriteLayerThreeOverride>();
 
-  constructor(protoSpriteInstance: ProtoSpriteInstance, texture: Texture) {
+  constructor(protoSpriteInstance: ProtoSpriteInstance, material: ShaderMaterial) {
     this.protoSpriteInstance = protoSpriteInstance;
-    this.texture = texture;
-    this.textureSize = new Vector2(
-      (this.texture.image as HTMLImageElement).naturalWidth,
-      (this.texture.image as HTMLImageElement).naturalHeight
-    );
+    const texture = (material.uniforms.map.value as Texture);
+    this.textureSize = new Vector2(texture.image.naturalWidth, texture.image.naturalHeight);
 
     const geom = new BufferGeometry();
-    const material = new ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      transparent: true,
-      uniforms: {
-        map: {
-          value: texture
-        },
-        opacity: {
-          value: 1
-        },
-        invSheetSize: {
-          value: new Vector2(1 / this.textureSize.x, 1 / this.textureSize.y)
-        }
-      }
-    });
 
     const mesh = new Mesh(geom, material);
     this.mesh = mesh;
@@ -626,8 +639,16 @@ export class ProtoSpriteThree {
   }
 
   setOpacity(opacity: number) {
-    this.mainLayer.material.uniforms.opacity.value = opacity;
-    this.mainLayer.material.uniformsNeedUpdate = true;
+    for (const layer of this.data.sprite.data.layers) {
+      if (layer.name === undefined) continue;
+      let overrides = this.layerOverrides.get(layer.name);
+      if (overrides === undefined) {
+        overrides = {};
+        this.layerOverrides.set(layer.name, overrides);
+      }
+      overrides.opacity = opacity;
+    }
+    this.extraDirty = true;
     return this;
   }
 

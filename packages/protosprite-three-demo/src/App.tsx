@@ -15,7 +15,7 @@ import {
 } from "three";
 
 import "./App.css";
-import protagSprite from "./protag.prs";
+import protagSprite from "./fire3.prs";
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -39,7 +39,7 @@ function App() {
       const scene = new Scene();
 
       const drawSprites: ProtoSpriteThree[] = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 512; i++) {
         const sprite = sheet.getSprite();
         sprite.hideLayers("bg");
         sprite.center();
@@ -48,6 +48,7 @@ function App() {
         sprite.data.animationState.speed = (Math.random() - 0.5) * 10;
         sprite.mesh.scale.y = -1;
         if (Math.random() > 0.5) sprite.mesh.scale.x = -1;
+        sprite.mesh.scale.multiplyScalar(0.5 + Math.random());
         sprite.mesh.position.x = Math.random() * 200;
         sprite.mesh.position.y = Math.random() * 200;
         sprite.mesh.position.z = Math.random() * 50;
@@ -60,8 +61,10 @@ function App() {
         // sprite.outlineAllLayers(1, new Color(0x000000), 1);
         for (const layer of sprite.data.sprite.data.layers) {
           if (layer.isGroup) continue;
-          sprite.fadeLayers(rndColor(), Math.random(), [layer.name]);
+          sprite.multiplyLayers(rndColor(), Math.random() * 0.5, [layer.name]);
         }
+
+        sprite.outlineAllLayers(1, rndColor(), 1);
 
         // sprite.setOpacity(0.25);
         // sprite.hideLayers("Group 4", "Group 5", "Group 7");
@@ -106,7 +109,7 @@ function App() {
       box3.getCenter(pos3);
       box3.getSize(size3);
 
-      size3.set(400, 400, 200);
+      // size3.set(400, 400, 200);
 
       const camera = new OrthographicCamera(
         -size3.x * 0.5,

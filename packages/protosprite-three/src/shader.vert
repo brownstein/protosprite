@@ -1,6 +1,5 @@
 uniform vec2 invSheetSize;
-uniform float opacity;
-
+\
 attribute float vtxIndex;
 attribute float vtxOpacity;
 attribute vec4 vtxMultColor;
@@ -21,7 +20,7 @@ void main() {
   // Apply special shader attributes.
   vColor = vec3(1.0, 1.0, 1.0) * (1.0 - vtxMultColor.w) + vtxMultColor.rgb * vtxMultColor.w;
   vFade = vtxFadeColor;
-  vOpacity = opacity * vtxOpacity;
+  vOpacity = vtxOpacity;
 
   vec3 pos = position;
 
