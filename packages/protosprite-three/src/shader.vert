@@ -1,5 +1,5 @@
 uniform vec2 invSheetSize;
-\
+
 attribute float vtxIndex;
 attribute float vtxOpacity;
 attribute vec4 vtxMultColor;

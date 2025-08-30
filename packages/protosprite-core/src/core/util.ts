@@ -121,7 +121,7 @@ export class ProtoSpriteInstanceAnimationState {
     if (animationName !== null) {
       const animation = this.dataMap.animationMap.get(animationName);
       if (animation !== undefined && animation !== this.currentAnimation) {
-
+        nextAnimation = animation;
       } 
     }
     changedAnimation = nextAnimation !== this.currentAnimation;
