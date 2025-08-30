@@ -8,6 +8,7 @@ import { Color, Scene } from "three";
 import "./App.css";
 import { Renderer } from "./components/Renderer";
 import wolfSprite from "./wolf.prs";
+import protagSprite from "./protag4.prs";
 
 function App() {
   const scene = useMemo(() => new Scene(), []);
@@ -16,18 +17,20 @@ function App() {
   useEffect(() => {
     const doTheThing = async () => {
       const loader = new ProtoSpriteSheetThreeLoader();
-      const sheet = await loader.loadAsync(wolfSprite);
+      const sheet = await loader.loadAsync(protagSprite);
       const sprites: ProtoSpriteThree[] = [];
 
-      let iIndex = 0;
-      for (let y = 0; y < 3; y++) {
-        for (let x = 0; x < 4; x++) {
+      const iterX = 25;
+      const iterY = 15;
+      for (let y = 0; y < iterY; y++) {
+        for (let x = 0; x < iterX; x++) {
           const sprite = sheet.getSprite();
           sprite.center();
           sprite.mesh.scale.y = -1;
-          sprite.mesh.position.x = x * 64;
-          sprite.mesh.position.y = -y * 64;
+          sprite.mesh.position.x = x * 64 - iterX * 32;
+          sprite.mesh.position.y = -y * 64 + iterY * 32;
           sprite.hideLayers("Engine");
+          sprite.gotoAnimation("idle");
           for (const layer of sprite.data.sprite.data.layers) {
             sprite.multiplyLayers(
               new Color(Math.random(), Math.random(), Math.random()),

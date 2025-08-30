@@ -554,7 +554,8 @@ export class ProtoSpriteThree {
   }
 
   advance(ms: number) {
-    this.positionDirty ||= this.protoSpriteInstance.animationState.advance(ms);
+    const dirty = this.protoSpriteInstance.animationState.advance(ms);
+    this.positionDirty ||= dirty;
     return this;
   }
 
