@@ -155,6 +155,17 @@ export class ProtoSpriteSheetThree {
   constructor(sheet: ProtoSpriteSheet) {
     this.sheet = sheet;
   }
+  dispose() {
+    this.sheetTexture?.dispose();
+    this.sheetTexture = undefined;
+    for (const texture of this.individualTextures?.values() ?? []) texture.dispose();
+    this.individualTextures = undefined; 
+    this.sheetMaterial?.dispose();
+    this.sheetMaterial = undefined;
+    for (const material of this.individualMaterials?.values() ?? []) material.dispose();
+    this.individualMaterials = undefined;
+    this.materialsGenerated = false;
+  }
   getSprite(indexOrName?: number | string) {
     if (indexOrName === undefined) return this._createSprite(0);
     if (typeof indexOrName === "number") return this._createSprite(indexOrName);
@@ -356,6 +367,10 @@ export class ProtoSpriteThree {
 
     this.updateGeometry();
     this.updateExtra();
+  }
+
+  dispose() {
+    this.mainLayer.geom.dispose();
   }
 
   private updateGeometry() {

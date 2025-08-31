@@ -153,6 +153,9 @@ function App() {
   useEffect(() => {
     scene.clear();
     for (const sprite of sprites) scene.add(sprite.mesh);
+    return () => {
+      for (const sprite of sprites) sprite.dispose();
+    };
   }, [scene, sprites]);
 
   const animationList = useMemo<string[]>(() => {
