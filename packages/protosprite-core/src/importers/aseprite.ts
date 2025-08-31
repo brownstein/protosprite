@@ -2,6 +2,7 @@ import * as Aseprite from "@kayahr/aseprite";
 
 import {
   AnimationData,
+  EmbeddedSpriteSheetData,
   ExternalSpriteSheetData,
   FrameData,
   FrameLayerData,
@@ -46,6 +47,7 @@ export function importAsepriteSheetExport(
     referenceType?: "file" | "url";
     frameNameFormat?: string;
     assetPath?: string;
+    pngArray?: Uint8Array;
     debug?: boolean;
   }
 ) {
@@ -175,16 +177,20 @@ export function importAsepriteSheetExport(
     sprite.name = firstMatch.title;
   }
 
-  const pixelSource = new ExternalSpriteSheetData();
-  const isFile = opt?.referenceType === "file";
-  if (isFile) {
-    pixelSource.fileName = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
+  if (opt?.pngArray !== undefined) {
+    const pixelSource = new EmbeddedSpriteSheetData();
+    pixelSource.pngData = opt.pngArray;
+    sprite.pixelSource = pixelSource;
   } else {
-    pixelSource.url = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
+    const pixelSource = new ExternalSpriteSheetData();
+    const isFile = opt?.referenceType === "file";
+    if (isFile) {
+      pixelSource.fileName = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
+    } else {
+      pixelSource.url = `${opt?.assetPath ?? ""}${sourceSheet.meta.image}`;
+    }
+    sprite.pixelSource = pixelSource;
   }
-
-  sprite.pixelSource = pixelSource;
-  if (opt?.debug) console.log("pixel source:", sprite.pixelSource);
 
   const hasLayers = sourceSheet.meta.layers !== undefined;
   const hasTags = sourceSheet.meta.frameTags !== undefined;

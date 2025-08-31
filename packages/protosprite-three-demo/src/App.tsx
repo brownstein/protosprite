@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Color, Scene } from "three";
 
 import "./App.css";
+import { Converter } from "./components/Converter";
 import { Renderer } from "./components/Renderer";
-import wolfSprite from "./wolf.prs";
 import protagSprite from "./protag4.prs";
 
 function App() {
@@ -20,8 +20,8 @@ function App() {
       const sheet = await loader.loadAsync(protagSprite);
       const sprites: ProtoSpriteThree[] = [];
 
-      const iterX = 25;
-      const iterY = 15;
+      const iterX = 5;
+      const iterY = 3;
       for (let y = 0; y < iterY; y++) {
         for (let x = 0; x < iterX; x++) {
           const sprite = sheet.getSprite();
@@ -63,6 +63,7 @@ function App() {
             }
           }}
         />
+        <Converter />
       </header>
     </div>
   );
