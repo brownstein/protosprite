@@ -31,7 +31,8 @@
     "build:clean": "rm -rf ./proto_dist ./dist",
     "build:buf": "buf generate",
     "build:rollup": "rollup -c",
-    "build": "npm run build:clean && npm run build:buf && npm run build:rollup"
+    "build": "npm run build:clean && npm run build:buf && npm run build:rollup",
+    "prepublish": "npm run build"
   },
   "directories": {
     "src": "src",
