@@ -119,3 +119,25 @@
   height: 128px;
   padding: 8px;
 }
+
+.display-file .download-display-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  margin-top: 10%;
+  width: 60%;
+  background-color:rgba(0, 0, 0, 0.5);
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  flex-grow: 1;
+}
+
+.display-file .download-display-file .icon {
+  width: 40%;
+  height: 40%;
+}
+
+.downloader {
+  cursor: pointer;
+}

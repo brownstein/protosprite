@@ -1,9 +1,13 @@
-import { JsonValue, fromBinary, fromJson, toBinary } from "@bufbuild/protobuf";
-import { faChevronRight, faClose } from "@fortawesome/free-solid-svg-icons";
+import { fromBinary, toBinary } from "@bufbuild/protobuf";
+import {
+  faChevronRight,
+  faClose,
+  faDownload
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import * as Aseprite from "@kayahr/aseprite";
 import cx from "classnames";
-import { Data, ProtoSpriteSheet, Protos } from "protosprite-core";
+import { Data, Protos } from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
 import { packSpriteSheet } from "protosprite-core/transform";
 import {
@@ -14,6 +18,7 @@ import {
   useState
 } from "react";
 import { FileWithPath, useDropzone } from "react-dropzone";
+import download from "js-file-download";
 
 import "./Converter.css";
 
@@ -48,14 +53,16 @@ type UploadedFile =
   | JsonFileToDisplay
   | ProtoSpriteFileToDisplay;
 
-type ProtoSpriteDownload = {
+type ProtoSpriteResult = {
   type: "sprite/protosprite";
+  data: Data.SpriteSheetData;
   imageUrl?: string;
   fileSize: number;
   blobUrl: string;
 };
 
 export function Converter(props: ConverterProps) {
+  const { onPreviewSprite } = props;
   const [allFiles, setAllFiles] = useState<FileWithPath[]>([]);
 
   const { getRootProps, getInputProps } = useDropzone({
@@ -65,28 +72,95 @@ export function Converter(props: ConverterProps) {
       "sprite/protosprite": [".prs"]
     },
     onDropAccepted(files) {
-      setAllFiles((currentFiles) => [...currentFiles, ...files]);
+      setAllFiles((currentFiles) => [
+        ...currentFiles,
+        ...files.filter(
+          (file) =>
+            !currentFiles.find((cf) => cf.path === (file as FileWithPath).path)
+        )
+      ]);
     }
   });
-  const onRemoveFile = useCallback(
-    (file: FileWithPath) =>
-      setAllFiles((currentFiles) =>
-        currentFiles.filter((currentFile) => file.path !== currentFile.path)
-      ),
-    []
-  );
 
   const [isProcessing, setProcessing] = useState(false);
-  const [processedFile, setProcessedFile] =
-    useState<ProtoSpriteDownload | null>(null);
+  const [processedFile, setProcessedFile] = useState<ProtoSpriteResult | null>(
+    null
+  );
   const processIState = useMemo(
     () => ({
       allFiles,
-      allProcessedFiles: [] as UploadedFile[]
+      allProcessedFiles: [] as UploadedFile[],
+      onPreview: undefined as typeof onPreviewSprite
     }),
     []
   );
   processIState.allFiles = allFiles;
+  processIState.onPreview = onPreviewSprite;
+
+  const onProcessedFilesUpdate = useCallback(async () => {
+    setProcessing(true);
+    // Ok, now for the fun part. We get to check if we have all data and can pack
+    // a resulting sprite sheet.
+    const availablePngsByName = new Map<string, PngFileToDisplay>();
+    const availableSprites: Aseprite.SpriteSheet[] = [];
+    let resultSheet = new Data.SpriteSheetData();
+    for (const processed of processIState.allProcessedFiles) {
+      switch (processed.type) {
+        case "application/json":
+          availableSprites.push(processed.json as Aseprite.SpriteSheet);
+          break;
+        case "image/png":
+          availablePngsByName.set(processed.file.name, processed);
+          break;
+        case "sprite/protosprite":
+          resultSheet = processed.spriteSheetData.clone();
+          break;
+      }
+    }
+    for (const spriteJson of availableSprites) {
+      const pngFileName = spriteJson.meta.image;
+      const referencedProcessedPng = availablePngsByName.get(pngFileName);
+      if (!referencedProcessedPng) continue;
+      const sprite = await importAsepriteSheetExport(spriteJson, {
+        pngArray: new Uint8Array(
+          await (
+            await fetch(referencedProcessedPng.imageUrl ?? "")
+          ).arrayBuffer()
+        ),
+        frameNameFormat: "{title} ({layer}) {frame}.{extension}",
+        debug: true
+      });
+      resultSheet.sprites.push(sprite);
+    }
+    if (!resultSheet.sprites.length) {
+      setProcessing(false);
+      return;
+    }
+    const packed = (await packSpriteSheet(resultSheet)) as Data.SpriteSheetData;
+    const packedProto = packed.toProto();
+    const packedArray = toBinary(Protos.SpriteSheetSchema, packedProto);
+    let imageUrl: string | undefined;
+    if (
+      Data.isEmbeddedSpriteSheetData(packed.pixelSource) &&
+      packed.pixelSource.pngData !== undefined
+    ) {
+      imageUrl = URL.createObjectURL(
+        new Blob([new Uint8Array(packed.pixelSource.pngData)], {
+          type: "image/png"
+        })
+      );
+    }
+    const result: ProtoSpriteResult = {
+      type: "sprite/protosprite",
+      data: packed,
+      imageUrl,
+      fileSize: packedArray.length,
+      blobUrl: URL.createObjectURL(new Blob([packedArray]))
+    };
+    setProcessedFile(result);
+    setProcessing(false);
+    processIState.onPreview?.(packed);
+  }, [processIState]);
 
   const onProcessed = useCallback(
     async (processed: UploadedFile) => {
@@ -107,50 +181,23 @@ export function Converter(props: ConverterProps) {
       }
       if (alreadyHandled) return;
       processIState.allProcessedFiles.push(processed);
-
-      // Ok, now for the fun part. We get to check if we have all data and can pack
-      // a resulting sprite sheet.
-      const availablePngsByName = new Map<string, PngFileToDisplay>();
-      const availableSprites: Aseprite.SpriteSheet[] = [];
-      let resultSheet = new Data.SpriteSheetData();
-      for (const processed of processIState.allProcessedFiles) {
-        switch (processed.type) {
-          case "application/json":
-            availableSprites.push(processed.json as Aseprite.SpriteSheet);
-            break;
-          case "image/png":
-            availablePngsByName.set(processed.file.name, processed);
-            break;
-          case "sprite/protosprite":
-            resultSheet = processed.spriteSheetData.clone();
-            break;
-        }
-      }
-      for (const spriteJson of availableSprites) {
-        const pngFileName = spriteJson.meta.image;
-        const referencedProcessedPng = availablePngsByName.get(pngFileName);
-        if (!referencedProcessedPng) continue;
-        const sprite = await importAsepriteSheetExport(spriteJson, {
-          pngArray: new Uint8Array(
-            await (
-              await fetch(referencedProcessedPng.imageUrl ?? "")
-            ).arrayBuffer()
-          ),
-          frameNameFormat: "{title} ({layer}) {frame}.{extension}",
-          debug: true
-        });
-        resultSheet.sprites.push(sprite);
-      }
-      const packed = await packSpriteSheet(resultSheet);
-      const packedProto = packed.toProto();
-      const packedArray = toBinary(Protos.SpriteSheetSchema, packedProto);
-      setProcessedFile({
-        type: "sprite/protosprite",
-        fileSize: packedArray.length,
-        blobUrl: URL.createObjectURL(new Blob([packedArray]))
-      });
+      onProcessedFilesUpdate();
     },
-    [processIState]
+    [processIState, onProcessedFilesUpdate]
+  );
+
+  const onRemoveFile = useCallback(
+    (file: FileWithPath) => {
+      setProcessedFile(null);
+      setAllFiles((currentFiles) =>
+        currentFiles.filter((currentFile) => file.path !== currentFile.path)
+      );
+      processIState.allProcessedFiles = processIState.allProcessedFiles.filter(
+        (processed) => processed.file.path !== file.path
+      );
+      onProcessedFilesUpdate();
+    },
+    [processIState, onProcessedFilesUpdate]
   );
 
   const fileSizeString = useMemo(() => {
@@ -161,6 +208,12 @@ export function Converter(props: ConverterProps) {
       return `${processedFile.fileSize / 1000} KB`;
     return `${processedFile.fileSize} Bytes`;
   }, [processedFile?.fileSize]);
+
+  const onDownloadResult = useCallback(async () => {
+    if (!processedFile?.blobUrl) return;
+    const res = await fetch(processedFile.blobUrl);
+    download(await res.blob(), "packed.prs");
+  }, [processedFile]);
 
   return (
     <div className="converter">
@@ -191,9 +244,14 @@ export function Converter(props: ConverterProps) {
         />
       )}
       {processedFile && (
-        <div className="downloader">
+        <div className="downloader" onClick={onDownloadResult}>
           <div className="display-file">
-            <div className="file-name">result</div>
+            <div className="download-display-file"><FontAwesomeIcon className="icon" icon={faDownload} /></div>
+            {processedFile.imageUrl && (
+              <div className="preview">
+                <img src={processedFile.imageUrl} />
+              </div>
+            )}
             {processedFile?.type && (
               <div className="file-type">{processedFile.type}</div>
             )}

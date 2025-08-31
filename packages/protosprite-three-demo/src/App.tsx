@@ -1,4 +1,6 @@
+import { ProtoSpriteSheet } from "protosprite-core";
 import {
+  ProtoSpriteSheetThree,
   ProtoSpriteSheetThreeLoader,
   ProtoSpriteThree
 } from "protosprite-three";
@@ -12,11 +14,11 @@ import protagSprite from "./protag4.prs";
 
 function App() {
   const scene = useMemo(() => new Scene(), []);
+  const loader = useMemo(() => new ProtoSpriteSheetThreeLoader(), []);
   const [sprites, setSprites] = useState<ProtoSpriteThree[]>([]);
 
   useEffect(() => {
     const doTheThing = async () => {
-      const loader = new ProtoSpriteSheetThreeLoader();
       const sheet = await loader.loadAsync(protagSprite);
       const sprites: ProtoSpriteThree[] = [];
 
@@ -45,7 +47,7 @@ function App() {
       setSprites(sprites);
     };
     doTheThing();
-  }, []);
+  }, [loader]);
 
   useEffect(() => {
     scene.clear();
@@ -55,6 +57,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
+        <h3>Sprite Preview</h3>
         <Renderer
           scene={scene}
           onBeforeRender={(delta) => {
@@ -64,7 +67,26 @@ function App() {
           }}
         />
         <h3>Preview your own files (Aseprite or ProtoSprite)</h3>
-        <Converter />
+        <Converter
+          onPreviewSprite={async (sheet) => {
+            const spriteSheet = new ProtoSpriteSheet(sheet);
+            const spriteSheetThree = await loader.loadAsync(spriteSheet);
+            const sprites: ProtoSpriteThree[] = [];
+            let totalWidth = 0;
+            spriteSheet.sprites.forEach((_sprite, index) => {
+              const spriteThree = spriteSheetThree.getSprite(index);
+              spriteThree.center();
+              spriteThree.mesh.position.x = totalWidth;
+              spriteThree.mesh.scale.y = -1;
+              totalWidth += spriteThree.data.sprite.data.size.width;
+              sprites.push(spriteThree);
+            });
+            for (const spriteThree of sprites) {
+              spriteThree.mesh.position.x -= totalWidth / 2;
+            }
+            setSprites(sprites);
+          }}
+        />
       </header>
     </div>
   );
