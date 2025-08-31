@@ -127,7 +127,6 @@ export function Converter(props: ConverterProps) {
             await fetch(referencedProcessedPng.imageUrl ?? "")
           ).arrayBuffer()
         ),
-        frameNameFormat: "{title} ({layer}) {frame}.{extension}",
         debug: true
       });
       resultSheet.sprites.push(sprite);

@@ -17,6 +17,9 @@ function App() {
   const loader = useMemo(() => new ProtoSpriteSheetThreeLoader(), []);
   const [sprites, setSprites] = useState<ProtoSpriteThree[]>([]);
 
+  // USEME.
+  const [renderSprites, setRenderSprites] = useState<ProtoSpriteThree[]>([]);
+
   useEffect(() => {
     const doTheThing = async () => {
       const sheet = await loader.loadAsync(protagSprite);
