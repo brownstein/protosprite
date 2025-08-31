@@ -63,6 +63,7 @@ function App() {
             }
           }}
         />
+        <h3>Preview your own files (Aseprite or ProtoSprite)</h3>
         <Converter />
       </header>
     </div>

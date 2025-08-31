@@ -31,3 +31,7 @@
 canvas {
   image-rendering: pixelated;
 }
+
+h3 {
+  font-size: 16px;
+}
