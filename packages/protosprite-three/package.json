@@ -17,7 +17,8 @@
   "scripts": {
     "build:clean": "rm -rf ./dist",
     "build:rollup": "rollup -c",
-    "build": "npm run build:rollup"
+    "build": "npm run build:rollup",
+    "prepublish": "npm run build:clean && npm run build"
   },
   "directories": {
     "src": "src",
