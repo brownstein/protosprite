@@ -32,6 +32,66 @@ canvas {
   image-rendering: pixelated;
 }
 
+h1 {
+  margin: 0;
+  padding: 0;
+}
+
 h3 {
   font-size: 16px;
+}
+
+.package-name-span {
+  font-weight: bold;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.about {
+  max-width: 80vw;
+  width: 800px;
+}
+
+.about .explanation {
+  font-size: 0.8em;
+}
+
+.params {
+  max-width: 80vw;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1em;
+}
+
+.param {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  &.odd {
+    align-items: flex-end;
+  }
+  &.param-row {
+    flex-direction: row;
+  }
+  justify-content: flex-start;
+  width: 38vw;
+  position: relative;
+}
+
+.slider-picker {
+  flex: 1;
+}
+
+.layers-list {
+  padding: 8px 8px 8px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
 }

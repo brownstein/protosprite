@@ -379,7 +379,12 @@ export class ProtoSpriteThree {
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
       );
-      if (layer === undefined || layer.isGroup) continue;
+      if (
+        layer === undefined ||
+        layer.isGroup ||
+        this.hiddenLayerNames.has(layer.name)
+      )
+        continue;
       let groupLayerIndex = layer.parentIndex;
       let groupHidden = false;
       while (groupLayerIndex !== undefined) {
@@ -479,7 +484,12 @@ export class ProtoSpriteThree {
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
       );
-      if (layer === undefined || layer.isGroup) continue;
+      if (
+        layer === undefined ||
+        layer.isGroup ||
+        this.hiddenLayerNames.has(layer.name)
+      )
+        continue;
       let groupLayerIndex = layer.parentIndex;
       let groupHidden = false;
       while (groupLayerIndex !== undefined) {

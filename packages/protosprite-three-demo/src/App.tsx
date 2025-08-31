@@ -1,3 +1,18 @@
+import {
+  Button,
+  Checkbox,
+  FormControlLabel,
+  MenuItem,
+  Popover,
+  Select,
+  Slider,
+  Tab,
+  Tabs,
+  ThemeProvider,
+  Typography,
+  createTheme
+} from "@mui/material";
+import binPack from "bin-pack";
 import { ProtoSpriteSheet } from "protosprite-core";
 import {
   ProtoSpriteSheetThree,
@@ -5,93 +20,375 @@ import {
   ProtoSpriteThree
 } from "protosprite-three";
 import { useEffect, useMemo, useState } from "react";
-import { Color, Scene } from "three";
+import { SliderPicker } from "react-color";
+import { Box3, Color, Scene } from "three";
 
 import "./App.css";
+import birdSprite from "./bird.prs";
 import { Converter } from "./components/Converter";
 import { Renderer } from "./components/Renderer";
-import protagSprite from "./protag4.prs";
+
+const theme = createTheme({
+  palette: {
+    mode: "dark"
+  }
+});
 
 function App() {
   const scene = useMemo(() => new Scene(), []);
   const loader = useMemo(() => new ProtoSpriteSheetThreeLoader(), []);
+
+  const [sheet, setSheet] = useState<ProtoSpriteSheetThree | null>(null);
   const [sprites, setSprites] = useState<ProtoSpriteThree[]>([]);
 
-  // USEME.
-  const [renderSprites, setRenderSprites] = useState<ProtoSpriteThree[]>([]);
+  const [currentAnimation, setCurrentAnimation] = useState("Fly");
+  const [currentPlaybackSpeed, setCurrentPlaybackSpeed] = useState(1);
+  const [currentOpacity, setCurrentOpacity] = useState(1);
+  const [currentOutlineEnabled, setCurrentOutlineEnabled] = useState(false);
+  const [currentOutlineColor, setCurrentOutlineColor] = useState(0);
+  const [currentSpriteCount, setCurrentSpriteCount] = useState(1);
+  const [currentHiddenLayers, setCurrentHiddenLayers] = useState<
+    Set<string> | undefined
+  >();
+
+  const iState = useMemo(
+    () => ({
+      currentAnimation: "Fly",
+      currentPlaybackSpeed: 1,
+      currentOpacity: 1,
+      currentOutlineEnabled: true,
+      currentOutlineColor: 0,
+      currentSpriteCount,
+      currentHiddenLayers: undefined as Set<string> | undefined
+    }),
+    [currentSpriteCount]
+  );
+  iState.currentAnimation = currentAnimation;
+  iState.currentPlaybackSpeed = currentPlaybackSpeed;
+  iState.currentOpacity = currentOpacity;
+  iState.currentOutlineEnabled = currentOutlineEnabled;
+  iState.currentOutlineColor = currentOutlineColor;
+  iState.currentSpriteCount = currentSpriteCount;
+  iState.currentHiddenLayers = currentHiddenLayers;
 
   useEffect(() => {
-    const doTheThing = async () => {
-      const sheet = await loader.loadAsync(protagSprite);
-      const sprites: ProtoSpriteThree[] = [];
-
-      const iterX = 5;
-      const iterY = 3;
-      for (let y = 0; y < iterY; y++) {
-        for (let x = 0; x < iterX; x++) {
-          const sprite = sheet.getSprite();
-          sprite.center();
-          sprite.mesh.scale.y = -1;
-          sprite.mesh.position.x = x * 64 - iterX * 32;
-          sprite.mesh.position.y = -y * 64 + iterY * 32;
-          sprite.hideLayers("Engine");
-          sprite.gotoAnimation("idle");
-          for (const layer of sprite.data.sprite.data.layers) {
-            sprite.multiplyLayers(
-              new Color(Math.random(), Math.random(), Math.random()),
-              Math.random() * 0.9,
-              [layer.name]
-            );
-          }
-          sprites.push(sprite);
-        }
-      }
-
-      setSprites(sprites);
-    };
-    doTheThing();
+    loader.loadAsync(birdSprite).then(setSheet);
   }, [loader]);
+
+  useEffect(() => {
+    if (!sheet) return;
+    const { currentSpriteCount } = iState;
+    type Bounds = {
+      spriteThree: ProtoSpriteThree;
+      width: number;
+      height: number;
+    };
+    const toPack: Bounds[] = [];
+
+    if (sheet.sheet.sprites.length >= iState.currentSpriteCount) {
+      for (
+        let spriteIndex = 0;
+        spriteIndex < sheet.sheet.sprites.length;
+        spriteIndex++
+      ) {
+        const spriteThree = sheet.getSprite(spriteIndex);
+        spriteThree.gotoAnimation(iState.currentAnimation);
+        spriteThree.center();
+        spriteThree.mesh.scale.y = -1;
+        const bbox = new Box3()
+          .expandByObject(spriteThree.mesh)
+          .expandByScalar(2);
+        const bounds: Bounds = {
+          width: bbox.max.x - bbox.min.x,
+          height: bbox.max.y - bbox.min.y,
+          spriteThree
+        };
+        toPack.push(bounds);
+      }
+    } else {
+      for (let i = 0; i < iState.currentSpriteCount; i++) {
+        const spriteThree = sheet.getSprite(i % sheet.sheet.sprites.length);
+        spriteThree.gotoAnimation(iState.currentAnimation);
+        spriteThree.center();
+        spriteThree.mesh.scale.y = -1;
+        const bbox = new Box3()
+          .expandByObject(spriteThree.mesh)
+          .expandByScalar(2);
+        const bounds: Bounds = {
+          width: bbox.max.x - bbox.min.x,
+          height: bbox.max.y - bbox.min.y,
+          spriteThree
+        };
+        toPack.push(bounds);
+      }
+    }
+
+    const packed = binPack(toPack);
+
+    const sprites: ProtoSpriteThree[] = [];
+    for (const packedBin of packed.items) {
+      const spriteThree = packedBin.item.spriteThree;
+      spriteThree.mesh.position.x =
+        packedBin.x + packedBin.width * 0.5 - packed.width * 0.5;
+      spriteThree.mesh.position.y =
+        packedBin.y + packedBin.width * 0.5 - packed.height * 0.5;
+
+      if (iState.currentOpacity !== 1)
+        spriteThree.setOpacity(iState.currentOpacity);
+      if (iState.currentOutlineEnabled)
+        spriteThree.outlineAllLayers(
+          1,
+          new Color(iState.currentOutlineColor),
+          1
+        );
+      spriteThree.data.animationState.speed = iState.currentPlaybackSpeed;
+      if (iState.currentHiddenLayers)
+        spriteThree.hideLayers(...iState.currentHiddenLayers.values());
+
+      sprites.push(spriteThree);
+    }
+
+    setSprites(sprites);
+  }, [sheet, iState]);
 
   useEffect(() => {
     scene.clear();
     for (const sprite of sprites) scene.add(sprite.mesh);
   }, [scene, sprites]);
 
+  const animationList = useMemo<string[]>(() => {
+    if (!sheet) return [];
+    const animationSet = new Set<string>();
+    for (const sprite of sheet.sheet.sprites) {
+      for (const animation of sprite.data.animations) {
+        animationSet.add(animation.name);
+      }
+    }
+    const animations = [...animationSet.values()];
+    animations.sort((a, b) => a.localeCompare(b));
+    return animations;
+  }, [sheet]);
+
+  const layersList = useMemo<string[]>(() => {
+    if (!sheet) return [];
+    const layerSet = new Set<string>();
+    for (const sprite of sheet.sheet.sprites) {
+      for (const layer of sprite.data.layers) {
+        layerSet.add(layer.name);
+      }
+    }
+    const layers = [...layerSet.values()];
+    layers.sort((a, b) => a.localeCompare(b));
+    return layers;
+  }, [sheet]);
+
+  const [currentTab, setCurrentTab] = useState("about");
+  const [layersListOpen, setLayersListOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <h3>Sprite Preview</h3>
-        <Renderer
-          scene={scene}
-          onBeforeRender={(delta) => {
-            for (const sprite of sprites) {
-              sprite.advance(delta);
-            }
-          }}
-        />
-        <h3>Preview your own files (Aseprite or ProtoSprite)</h3>
-        <Converter
-          onPreviewSprite={async (sheet) => {
-            const spriteSheet = new ProtoSpriteSheet(sheet);
-            const spriteSheetThree = await loader.loadAsync(spriteSheet);
-            const sprites: ProtoSpriteThree[] = [];
-            let totalWidth = 0;
-            spriteSheet.sprites.forEach((_sprite, index) => {
-              const spriteThree = spriteSheetThree.getSprite(index);
-              spriteThree.center();
-              spriteThree.mesh.position.x = totalWidth;
-              spriteThree.mesh.scale.y = -1;
-              totalWidth += spriteThree.data.sprite.data.size.width;
-              sprites.push(spriteThree);
-            });
-            for (const spriteThree of sprites) {
-              spriteThree.mesh.position.x -= totalWidth / 2;
-            }
-            setSprites(sprites);
-          }}
-        />
-      </header>
-    </div>
+    <ThemeProvider theme={theme}>
+      <div className="App">
+        <header className="App-header">
+          <Renderer
+            scene={scene}
+            onBeforeRender={(delta) => {
+              for (const sprite of sprites) {
+                sprite.advance(delta);
+              }
+            }}
+          />
+          <div className="main">
+            <Tabs
+              value={currentTab}
+              onChange={(_e, value) => setCurrentTab(value)}
+            >
+              <Tab label="About" value="about" />
+              <Tab label="Sprite Playground" value="rendering" />
+              <Tab label="Import" value="import" />
+            </Tabs>
+            {currentTab === "about" && (
+              <div className="about">
+                <h1>protosprite-three</h1>
+                <h3>A package for rendering Protosprite files in Three.js.</h3>
+                <p className="explanation">
+                  <span className="package-name-span">protosprite-three</span>{" "}
+                  makes it easy to render sprites in three.js, leveraging
+                  protosprite, a protobuf based binary encoding format. This can
+                  yield significant performance gains over JSON based encodings
+                  that feature repeated strings.
+                </p>
+              </div>
+            )}
+            {currentTab === "rendering" && (
+              <div>
+                <h3>Here are some rendering parameters to play with.</h3>
+                <div className="params">
+                  <div className="param odd">
+                    <Typography>Animation</Typography>
+                    <Select
+                      value={currentAnimation}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCurrentAnimation(value);
+                        for (const sprite of sprites)
+                          sprite.gotoAnimation(value);
+                      }}
+                    >
+                      {animationList.map((animationName) => (
+                        <MenuItem key={animationName} value={animationName}>
+                          {animationName}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="param">
+                    <Typography>Playback Speed</Typography>
+                    <Slider
+                      min={-2}
+                      max={2}
+                      step={0.1}
+                      value={currentPlaybackSpeed}
+                      onChange={(e, value) => {
+                        setCurrentPlaybackSpeed(value);
+                        for (const sprite of sprites)
+                          sprite.data.animationState.speed = value;
+                      }}
+                    />
+                  </div>
+                  <div className="param odd">
+                    <Typography>Opacity</Typography>
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      value={currentOpacity}
+                      onChange={(e, value) => {
+                        setCurrentOpacity(value);
+                        for (const sprite of sprites) sprite.setOpacity(value);
+                      }}
+                    />
+                  </div>
+                  <div className="param param-row">
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={currentOutlineEnabled}
+                          onChange={(e) => {
+                            setCurrentOutlineEnabled(e.target.checked);
+                            for (const sprite of sprites)
+                              sprite.outlineAllLayers(
+                                1,
+                                new Color(0),
+                                e.target.checked ? 1 : 0
+                              );
+                          }}
+                          sx={{
+                            color: currentOutlineEnabled
+                              ? `#${new Color(currentOutlineColor).getHexString()}`
+                              : undefined,
+                            "&.Mui-checked": {
+                              color: currentOutlineEnabled
+                                ? `#${new Color(currentOutlineColor).getHexString()}`
+                                : undefined
+                            }
+                          }}
+                        />
+                      }
+                      label="Outline"
+                    />
+                    {currentOutlineEnabled && (
+                      <SliderPicker
+                        color={new Color(currentOutlineColor).getHexString()}
+                        onChange={(v) => {
+                          const value = new Color(v.hex);
+                          setCurrentOutlineColor(value.getHex());
+                          for (const sprite of sprites)
+                            sprite.outlineAllLayers(1, value, 1);
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="param odd">
+                    <Typography>Sprite Count</Typography>
+                    <Slider
+                      min={1}
+                      max={1000}
+                      step={1}
+                      value={currentSpriteCount}
+                      onChange={(_e, value) => {
+                        setCurrentSpriteCount(value);
+                      }}
+                    />
+                  </div>
+                  <div className="param">
+                    <Button
+                      onClick={(e) => {
+                        setAnchorEl(e.currentTarget);
+                        setLayersListOpen(true);
+                      }}
+                    >
+                      Show/Hide Layers
+                    </Button>
+                    <Popover
+                      anchorEl={anchorEl}
+                      open={layersListOpen}
+                      onClose={() => setLayersListOpen(false)}
+                    >
+                      <div className="layers-list">
+                        <Typography>Layers</Typography>
+                        {layersList.map((layerName) => (
+                          <div key={layerName}>
+                            <FormControlLabel
+                              label={layerName}
+                              control={
+                                <Checkbox
+                                  checked={!currentHiddenLayers?.has(layerName)}
+                                  onChange={(e) => {
+                                    const hiddenLayers = new Set(
+                                      currentHiddenLayers
+                                    );
+                                    if (!e.target.checked) {
+                                      hiddenLayers.add(layerName);
+                                      for (const sprite of sprites) {
+                                        sprite.hideLayers(layerName);
+                                      }
+                                    } else {
+                                      hiddenLayers.delete(layerName);
+                                      for (const sprite of sprites) {
+                                        sprite.showLayers(layerName);
+                                      }
+                                    }
+                                    setCurrentHiddenLayers(hiddenLayers);
+                                  }}
+                                />
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+            )}
+            {currentTab === "import" && (
+              <div>
+                <h3>Preview your own files (Aseprite or ProtoSprite)</h3>
+                <Converter
+                  onPreviewSprite={async (sheet) => {
+                    const spriteSheet = new ProtoSpriteSheet(sheet);
+                    const spriteSheetThree =
+                      await loader.loadAsync(spriteSheet);
+                    setSheet(spriteSheetThree);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </header>
+      </div>
+    </ThemeProvider>
   );
 }
 

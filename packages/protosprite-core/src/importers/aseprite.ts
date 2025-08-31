@@ -272,7 +272,7 @@ export function importAsepriteSheetExport(
       const frameNo = frameMatch.frame ?? autoFrameIndex++;
       const frame = getFrame(frameNo);
       frame.duration = sourceFrame.duration;
-      const frameLayerName = frameMatch.layer ?? "default";
+      const frameLayerName = frameMatch.layer ?? layersByName.keys().next().value ?? "default";
       const layer = getLayer(frameLayerName);
       const frameLayer = new FrameLayerData();
       frameLayer.layerIndex = layer.index;
@@ -291,7 +291,7 @@ export function importAsepriteSheetExport(
       const frameNo = frameMatch.frame ?? autoFrameIndex++;
       const frame = getFrame(frameNo);
       frame.duration = sourceFrame.duration;
-      const frameLayerName = frameMatch.layer ?? "default";
+      const frameLayerName = frameMatch.layer ?? layersByName.keys().next().value ?? "default";
       const layer = getLayer(frameLayerName);
       const frameLayer = new FrameLayerData();
       frameLayer.layerIndex = layer.index;

@@ -46,8 +46,8 @@ export function Renderer(props: RendererProps) {
       const sceneSize = new Vector3();
       sceneBBox.getCenter(sceneCenter);
       sceneBBox.getSize(sceneSize);
-      sceneSize.x = Math.max(sceneSize.x, 512);
-      sceneSize.y = Math.max(sceneSize.y, 512);
+      sceneSize.x = Math.max(sceneSize.x, 64);
+      sceneSize.y = Math.max(sceneSize.y, 64);
 
       const canvasSize = canvas.getBoundingClientRect();
       const cameraSize = sizeCameraToCanvas(new Vector2(sceneSize.x, sceneSize.y), canvasSize);
