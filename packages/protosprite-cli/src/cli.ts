@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { Command } from "@commander-js/extra-typings";
 import * as aseprite from "@kayahr/aseprite";
 import childProcess from "child_process";
