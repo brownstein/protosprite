@@ -2,6 +2,8 @@
 
 This package is the TypeScript implementation for `protosprite`, a protobuf-based sprite sheet encoding format. It contains protos, serialization utilities, encapsulation objects, and various utilities for transforming files into this format.
 
+Check out the Three.js-based demo [here](https://brownstein.github.io/protosprite/).
+
 ## Main Exports
 - `ProtoSpite` (default): a sprite within a `ProtoSpriteSheet`.
 - `ProtoSpriteSheet`: a sprite sheet.
