@@ -92,7 +92,7 @@ export function Converter(props: ConverterProps) {
       allProcessedFiles: [] as UploadedFile[],
       onPreview: undefined as typeof onPreviewSprite
     }),
-    []
+    [allFiles]
   );
   processIState.allFiles = allFiles;
   processIState.onPreview = onPreviewSprite;
@@ -248,7 +248,7 @@ export function Converter(props: ConverterProps) {
             <div className="download-display-file"><FontAwesomeIcon className="icon" icon={faDownload} /></div>
             {processedFile.imageUrl && (
               <div className="preview">
-                <img src={processedFile.imageUrl} />
+                <img src={processedFile.imageUrl} alt="sprite sheet"/>
               </div>
             )}
             {processedFile?.type && (
@@ -359,13 +359,13 @@ function DisplayFile(props: DisplayFileProps) {
   if (processedFile) {
     switch (processedFile.type) {
       case "image/png":
-        content = <img src={processedFile.imageUrl} />;
+        content = <img src={processedFile.imageUrl} alt="sprite sheet"/>;
         break;
       case "application/json":
         content = <div className="standin">{"{ }"}</div>;
         break;
       case "sprite/protosprite":
-        content = <img src={processedFile.imageUrl} />;
+        content = <img src={processedFile.imageUrl} alt="sprite sheet"/>;
         break;
     }
   } else {

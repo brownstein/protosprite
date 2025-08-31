@@ -36,7 +36,7 @@
     "start": "craco start",
     "build": "NODE_ENV=production craco build",
     "test": "craco test",
-    "deploy": "npm run build && gh-pages -d build",
+    "deploy": "PUBLIC_URL=https://brownstein.github.io/protosprite/ npm run build && gh-pages -d build",
     "analyze": "REACT_APP_INTERACTIVE_ANALYZE=1 npm run build"
   },
   "eslintConfig": {

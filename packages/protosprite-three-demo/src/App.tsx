@@ -77,7 +77,6 @@ function App() {
 
   useEffect(() => {
     if (!sheet) return;
-    const { currentSpriteCount } = iState;
     type Bounds = {
       spriteThree: ProtoSpriteThree;
       width: number;
