@@ -1,3 +1,4 @@
+import { Buffer } from "buffer";
 import { Jimp } from "jimp";
 
 import { EmbeddedSpriteSheetData, ExternalSpriteSheetData, SpriteData, isEmbeddedSpriteSheetData, isExternalSpriteSheetData } from "src/core/data.js";

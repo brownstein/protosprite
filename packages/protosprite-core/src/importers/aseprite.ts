@@ -21,7 +21,7 @@ export class FrameNameUnknownError extends Error {
 
 export class InvalidFrameNameError extends Error {
   constructor() {
-    super("Invalid frame name: failed to patch parts.");
+    super("Invalid frame name: failed to match parts.");
   }
 }
 

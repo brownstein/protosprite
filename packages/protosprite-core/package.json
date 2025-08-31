@@ -44,6 +44,7 @@
     "proto_dist"
   ],
   "dependencies": {
+    "buffer": "^6.0.3",
     "events": "^3.3.0",
     "js-base64": "^3.7.8"
   },
