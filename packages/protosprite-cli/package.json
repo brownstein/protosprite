@@ -6,7 +6,7 @@
   "bin": "./dist/cli.js",
   "scripts": {
     "bin": "node ./dist/cli.js",
-    "build": "rm -rf dist && tsc",
+    "build": "rm -rf dist && tsc && chmod +x dist/cli.js",
     "prettier": "pretty-quick --staged --pattern 'src/*.*(ts|tsx)'",
     "prepublish": "npm run build"
   },
