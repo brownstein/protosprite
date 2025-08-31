@@ -208,15 +208,27 @@ function App() {
             </Tabs>
             {currentTab === "about" && (
               <div className="about">
-                <h1>protosprite-three</h1>
-                <h3>A package for rendering Protosprite files in Three.js.</h3>
+                <h1>protosprite</h1>
                 <p className="explanation">
-                  <span className="package-name-span">protosprite-three</span>{" "}
-                  makes it easy to render sprites in three.js, leveraging
-                  protosprite, a protobuf based binary encoding format. This can
+                  A protobuf based binary encoding format for sprite sheets. This can
                   yield significant performance gains over JSON based encodings
                   that feature repeated strings.
                 </p>
+                <h3>Packages</h3>
+                <ul className="subpackages">
+                  <li>
+                    <a className="package-name" href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-core">protosprite-core</a>{" "}
+                    is the core implementation.
+                  </li>
+                  <li>
+                    <a className="package-name" href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-three">protosprite-three</a>{" "}
+                    is a Three.js renderer for protosprite.
+                  </li>
+                  <li>
+                    <a className="package-name" href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-cli">protosprite-cli</a>{" "}
+                    is a command line tool for working with protosprite.
+                  </li>
+                </ul>
               </div>
             )}
             {currentTab === "rendering" && (
@@ -373,7 +385,7 @@ function App() {
             )}
             {currentTab === "import" && (
               <div>
-                <h3>Preview your own files (Aseprite or ProtoSprite)</h3>
+                <h3>Preview your own files (Aseprite exports or ProtoSprite)</h3>
                 <Converter
                   onPreviewSprite={async (sheet) => {
                     const spriteSheet = new ProtoSpriteSheet(sheet);

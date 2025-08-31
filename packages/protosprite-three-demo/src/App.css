@@ -39,10 +39,31 @@ h1 {
 
 h3 {
   font-size: 16px;
+  text-align: center;
 }
 
-.package-name-span {
+.subpackages {
+  list-style: none;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.5em;
+  font-size: 0.8em;
+}
+
+.subpackages li {
+  margin: 0;
+  padding: 0;
+}
+
+.package-name {
   font-weight: bold;
+  color: #44aaff;
+  cursor: pointer;
 }
 
 .main {
@@ -56,6 +77,11 @@ h3 {
 .about {
   max-width: 80vw;
   width: 800px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: left;
 }
 
 .about .explanation {
