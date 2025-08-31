@@ -253,7 +253,6 @@ export function importAsepriteSheetExport(
 
   // Build frames.
   const framesByIndex = new Map<number, FrameData>();
-  const minFrameIndex = 0;
   let maxFrameIndex = 0;
   const getFrame = (frameIndex: number) => {
     const extant = framesByIndex.get(frameIndex);
@@ -272,7 +271,8 @@ export function importAsepriteSheetExport(
       const frameNo = frameMatch.frame ?? autoFrameIndex++;
       const frame = getFrame(frameNo);
       frame.duration = sourceFrame.duration;
-      const frameLayerName = frameMatch.layer ?? layersByName.keys().next().value ?? "default";
+      const frameLayerName =
+        frameMatch.layer ?? layersByName.keys().next().value ?? "default";
       const layer = getLayer(frameLayerName);
       const frameLayer = new FrameLayerData();
       frameLayer.layerIndex = layer.index;
@@ -291,7 +291,8 @@ export function importAsepriteSheetExport(
       const frameNo = frameMatch.frame ?? autoFrameIndex++;
       const frame = getFrame(frameNo);
       frame.duration = sourceFrame.duration;
-      const frameLayerName = frameMatch.layer ?? layersByName.keys().next().value ?? "default";
+      const frameLayerName =
+        frameMatch.layer ?? layersByName.keys().next().value ?? "default";
       const layer = getLayer(frameLayerName);
       const frameLayer = new FrameLayerData();
       frameLayer.layerIndex = layer.index;
@@ -307,16 +308,20 @@ export function importAsepriteSheetExport(
 
   const orderedFrames = [...framesByIndex.values()];
   orderedFrames.sort((a, b) => a.index - b.index);
-  let orderedFrameIndex = 0;
-  for (let i = minFrameIndex; i <= maxFrameIndex; i++) {
-    let frame = orderedFrames.at(orderedFrameIndex);
-    if (frame !== undefined && frame.index === i) {
-      orderedFrameIndex++;
-    } else {
-      frame = new FrameData();
-      frame.index = i;
+  let lastFrameIndex = orderedFrames.at(0)?.index ?? 0;
+  for (const orderedFrame of orderedFrames) {
+    for (let fi = lastFrameIndex; fi < orderedFrame.index; fi++) {
+      const missingFrame = new FrameData();
+      missingFrame.index = fi;
+      sprite.frames.push(missingFrame);
     }
-    sprite.frames.push(frame);
+    sprite.frames.push(orderedFrame);
+    lastFrameIndex = orderedFrame.index + 1;
+  }
+  for (let fi = lastFrameIndex; fi <= maxFrameIndex; fi++) {
+    const missingFrame = new FrameData();
+    missingFrame.index = fi;
+    sprite.frames.push(missingFrame);
   }
 
   // Build animations.
