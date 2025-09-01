@@ -258,9 +258,9 @@ export class ProtoSpriteThree<
   TLayers extends string | never = string,
   TAnimations extends string | never = string
 > {
-  public mesh: Mesh;
+  public readonly mesh: Mesh;
+  public readonly protoSpriteInstance: ProtoSpriteInstance;
 
-  private protoSpriteInstance: ProtoSpriteInstance;
   private textureSize: Vector2;
   private mainLayer: ProtoSpriteThreeLayer;
   private positionDirty = true;
@@ -423,7 +423,7 @@ export class ProtoSpriteThree<
       if (groupHidden) continue;
 
       const { size, sheetPosition, spritePosition } = layerFrame;
-      const z = layer.index;
+      const z = layer.index * 0.05;
 
       const i = drawIndex++;
 
@@ -667,11 +667,12 @@ export class ProtoSpriteThree<
     return true;
   }
 
-  private expandLayerGroups(layerNames: Iterable<string>) {
+  private expandLayerGroups(layerNames: string | Iterable<string>) {
+    const layerNamesIterable = typeof layerNames === "string" ? [layerNames] : layerNames;
     const dataMap = this.protoSpriteInstance.sprite.maps;
     const expandedLayerNames = new Set<string>();
     const groupIndexStack: number[] = [];
-    for (const layerName of layerNames) {
+    for (const layerName of layerNamesIterable) {
       const layer = dataMap.layerNameMap.get(layerName);
       if (layer === undefined) continue;
       if (layer.isGroup) {
@@ -707,7 +708,7 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  setLayerOpacity(opacity: number, layers: Iterable<TLayers>) {
+  setLayerOpacity(opacity: number, layers: TLayers | Iterable<TLayers>) {
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
       if (overrides === undefined) {
@@ -735,7 +736,7 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  fadeLayers(color: Color, opacity: number, layers: Iterable<TLayers>) {
+  fadeLayers(color: Color, opacity: number, layers: TLayers | Iterable<TLayers>) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
@@ -763,7 +764,7 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  multiplyLayers(color: Color, opacity: number, layers: Iterable<TLayers>) {
+  multiplyLayers(color: Color, opacity: number, layers: TLayers | Iterable<TLayers>) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
@@ -796,7 +797,7 @@ export class ProtoSpriteThree<
     thickness: number,
     color: Color,
     opacity: number,
-    layers: Iterable<TLayers>
+    layers: TLayers | Iterable<TLayers>
   ) {
     const outline = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
