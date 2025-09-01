@@ -381,7 +381,7 @@ export class ProtoSpriteThree<
     this.mainLayer.geom.dispose();
   }
 
-  private updateGeometry() {
+  updateGeometry() {
     const { geom, posArr, uvArr } = this.mainLayer;
 
     const invWidth = 1 / this.textureSize.x;
@@ -397,7 +397,7 @@ export class ProtoSpriteThree<
     let drawIndex = 0;
     const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
     const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
-    if (frame === undefined) return;
+    if (frame === undefined) return this;
     for (const layerFrame of frame.layers) {
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
@@ -487,9 +487,10 @@ export class ProtoSpriteThree<
       geom.boundingBox.min.y = yMin;
       geom.boundingBox.max.y = yMax;
     }
+    return this;
   }
 
-  private updateExtra() {
+  updateExtra() {
     const {
       geom,
       opacityArr,
@@ -584,6 +585,7 @@ export class ProtoSpriteThree<
     geom.getAttribute("vtxFadeColor").needsUpdate = true;
     geom.getAttribute("vtxOutline").needsUpdate = true;
     geom.getAttribute("vtxOutlineThickness").needsUpdate = true;
+    return this;
   }
 
   advance(ms: number) {
