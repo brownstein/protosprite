@@ -260,14 +260,22 @@ type ProtoSpriteLayerThreeOverride = {
   outlineThickness?: number;
 };
 
-export type ProtoSpriteThreeEventTypes = {
+type StringFallback<T extends string | never> = T extends never ? string : T;
+
+export type ProtoSpriteThreeEventTypes<
+  TAnimations extends string | never = string
+> = {
   animationFrameSwapped: {
-    animation: string | null;
-    from: number;
-    to: number;
+        animation: StringFallback<TAnimations> | null;
+        from: number;
+        to: number;
+      };
+  animationTagStarted: {
+    animation: StringFallback<TAnimations>;
   };
-  animationTagStarted: string;
-  animationLooped: string | null;
+  animationLooped: {
+    animation: StringFallback<TAnimations> | null;
+  };
 };
 
 export class ProtoSpriteThree<
@@ -277,7 +285,7 @@ export class ProtoSpriteThree<
   public readonly mesh: Mesh;
   public readonly protoSpriteInstance: ProtoSpriteInstance;
   public readonly events =
-    createTypedEventEmitter<ProtoSpriteThreeEventTypes>();
+    createTypedEventEmitter<ProtoSpriteThreeEventTypes<TAnimations>>();
 
   private textureSize: Vector2;
   private mainLayer: ProtoSpriteThreeLayer;
@@ -407,7 +415,9 @@ export class ProtoSpriteThree<
           const foundAnimationStart =
             this.protoSpriteInstance.sprite.maps.reverseAnimationMap.get(fi);
           if (foundAnimationStart) {
-            this.events.emit("animationTagStarted", foundAnimationStart.name);
+            this.events.emit("animationTagStarted", {
+              animation: foundAnimationStart.name as StringFallback<TAnimations>
+            });
           }
         }
       } else {
@@ -421,7 +431,9 @@ export class ProtoSpriteThree<
           const foundAnimationStart =
             this.protoSpriteInstance.sprite.maps.reverseAnimationMap.get(fi);
           if (foundAnimationStart) {
-            this.events.emit("animationTagStarted", foundAnimationStart.name);
+            this.events.emit("animationTagStarted", {
+              animation: foundAnimationStart.name as StringFallback<TAnimations>
+            });
           }
         }
         for (
@@ -434,24 +446,26 @@ export class ProtoSpriteThree<
           const foundAnimationStart =
             this.protoSpriteInstance.sprite.maps.reverseAnimationMap.get(fi);
           if (foundAnimationStart) {
-            this.events.emit("animationTagStarted", foundAnimationStart.name);
+            this.events.emit("animationTagStarted", {
+              animation: foundAnimationStart.name as StringFallback<TAnimations>
+            });
           }
         }
       }
     }
     this.events.emit("animationFrameSwapped", {
       animation:
-        this.protoSpriteInstance.animationState.currentAnimation?.name ?? null,
+        (this.protoSpriteInstance.animationState.currentAnimation?.name ?? null) as (StringFallback<TAnimations> | null),
       from,
       to
     });
   }
 
   private onAnimationLooped() {
-    this.events.emit(
-      "animationLooped",
-      this.protoSpriteInstance.animationState.currentAnimation?.name ?? null
-    );
+    this.events.emit("animationLooped", {
+      animation: (this.protoSpriteInstance.animationState.currentAnimation
+        ?.name ?? "") as StringFallback<TAnimations>
+    });
   }
 
   update() {
