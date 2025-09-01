@@ -167,11 +167,16 @@ export class ProtoSpriteSheetThree {
     this.materialsGenerated = false;
   }
   getSprite<
-    TLayers extends string = string,
-    TAnimations extends string = string
-  >(indexOrName?: number | string) {
-    if (indexOrName === undefined) return this._createSprite(0);
-    if (typeof indexOrName === "number") return this._createSprite(indexOrName);
+    TLayers extends string | never = string,
+    TAnimations extends string | never = string
+  >(indexOrName?: number | string): ProtoSpriteThree<TLayers, TAnimations> {
+    if (indexOrName === undefined)
+      return this._createSprite(0) as ProtoSpriteThree<TLayers, TAnimations>;
+    if (typeof indexOrName === "number")
+      return this._createSprite(indexOrName) as ProtoSpriteThree<
+        TLayers,
+        TAnimations
+      >;
     for (
       let sheetIndex = 0;
       sheetIndex < this.sheet.sprites.length;
