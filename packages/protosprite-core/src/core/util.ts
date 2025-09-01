@@ -146,7 +146,9 @@ export class ProtoSpriteInstanceAnimationState {
   advance(duration: number) {
     if (this.speed === 0) return false;
     this.currentFrameDurationRemaining -= duration * Math.abs(this.speed);
+    const initialFrame = this.currentFrame;
     let changedFrame = false;
+    let looped = false;
     while (this.currentFrameDurationRemaining <= 0) {
       changedFrame = true;
       if (this.speed > 0) {
@@ -154,10 +156,12 @@ export class ProtoSpriteInstanceAnimationState {
         if (this.currentAnimation) {
           if (this.currentFrame > this.currentAnimation.indexEnd) {
             this.currentFrame = this.currentAnimation.indexStart;
+            looped = true;
           }
         } else {
           if (this.currentFrame >= this.dataMap.frameMap.size) {
             this.currentFrame = 0;
+            looped = true;
           }
         }
       } else {
@@ -165,16 +169,29 @@ export class ProtoSpriteInstanceAnimationState {
         if (this.currentAnimation) {
           if (this.currentFrame < this.currentAnimation.indexStart) {
             this.currentFrame = this.currentAnimation.indexEnd;
+            looped = true;
           }
         } else {
           if (this.currentFrame <= 0) {
             this.currentFrame = this.dataMap.frameMap.size - 1;
+            looped = true;
           }
         }
       }
 
       const frame = this.dataMap.frameMap.get(this.currentFrame) ?? new FrameData();
       this.currentFrameDurationRemaining += frame.duration;
+    }
+
+    if (changedFrame) {
+      this.events.emit("FrameSwapped", {
+        from: initialFrame,
+        to: this.currentFrame
+      });
+    }
+
+    if (looped) {
+      this.events.emit("LoopComplete");
     }
 
     return changedFrame;

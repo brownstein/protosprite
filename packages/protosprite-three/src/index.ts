@@ -260,16 +260,16 @@ type ProtoSpriteLayerThreeOverride = {
   outlineThickness?: number;
 };
 
-type StringFallback<T extends string | never> = T extends never ? string : T;
+type StringFallback<T extends string | void> = T extends void ? string : T;
 
 export type ProtoSpriteThreeEventTypes<
-  TAnimations extends string | never = string
+  TAnimations extends string | void = string
 > = {
   animationFrameSwapped: {
-        animation: StringFallback<TAnimations> | null;
-        from: number;
-        to: number;
-      };
+    animation: StringFallback<TAnimations> | null;
+    from: number;
+    to: number;
+  };
   animationTagStarted: {
     animation: StringFallback<TAnimations>;
   };
@@ -278,9 +278,14 @@ export type ProtoSpriteThreeEventTypes<
   };
 };
 
+type SafeString<T extends string | void> = T extends void ? never : T;
+type SafeIterableStrings<T extends string | void> = T extends void
+  ? never
+  : Iterable<T>;
+
 export class ProtoSpriteThree<
-  TLayers extends string | never = string,
-  TAnimations extends string | never = string
+  TLayers extends string | void = string,
+  TAnimations extends string | void = string
 > {
   public readonly mesh: Mesh;
   public readonly protoSpriteInstance: ProtoSpriteInstance;
@@ -454,8 +459,8 @@ export class ProtoSpriteThree<
       }
     }
     this.events.emit("animationFrameSwapped", {
-      animation:
-        (this.protoSpriteInstance.animationState.currentAnimation?.name ?? null) as (StringFallback<TAnimations> | null),
+      animation: (this.protoSpriteInstance.animationState.currentAnimation
+        ?.name ?? null) as StringFallback<TAnimations> | null,
       from,
       to
     });
@@ -694,20 +699,25 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  gotoAnimation(animationName: TAnimations | null) {
+  gotoAnimation(animationName: SafeString<TAnimations> | null) {
     const swapped =
       this.protoSpriteInstance.animationState.startAnimation(animationName);
     this.positionDirty ||= swapped;
     return this;
   }
 
-  hideLayers(...layerNames: TLayers[]) {
+  setAnimationSpeed(speed: number) {
+    this.data.animationState.speed = speed;
+    return this;
+  }
+
+  hideLayers(...layerNames: SafeString<TLayers>[]) {
     for (const layerName of layerNames) this.hiddenLayerNames.add(layerName);
     this.positionDirty = true;
     return this;
   }
 
-  showLayers(...layerNames: TLayers[]) {
+  showLayers(...layerNames: SafeString<TLayers>[]) {
     for (const layerName of layerNames) this.hiddenLayerNames.delete(layerName);
     this.positionDirty = true;
     return this;
@@ -809,7 +819,10 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  setLayerOpacity(opacity: number, layers: TLayers | Iterable<TLayers>) {
+  setLayerOpacity(
+    opacity: number,
+    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
+  ) {
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
       if (overrides === undefined) {
@@ -840,7 +853,7 @@ export class ProtoSpriteThree<
   fadeLayers(
     color: Color,
     opacity: number,
-    layers: TLayers | Iterable<TLayers>
+    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
   ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -872,7 +885,7 @@ export class ProtoSpriteThree<
   multiplyLayers(
     color: Color,
     opacity: number,
-    layers: TLayers | Iterable<TLayers>
+    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
   ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -906,7 +919,7 @@ export class ProtoSpriteThree<
     thickness: number,
     color: Color,
     opacity: number,
-    layers: TLayers | Iterable<TLayers>
+    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
   ) {
     const outline = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
