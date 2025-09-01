@@ -143,6 +143,25 @@ export class ProtoSpriteInstanceAnimationState {
     return changedAnimation;
   }
 
+  gotoFrame(frameNumber: number) {
+    this.currentFrame = frameNumber;
+    const frame = this.dataMap.frameMap.get(this.currentFrame);
+    this.currentFrameDurationRemaining = frame?.duration ?? 100;
+  }
+
+  gotoAnimationFrame(frameNumber: number) {
+    if (this.currentAnimation) {
+      this.currentFrame =
+        this.currentAnimation.indexStart +
+        (frameNumber %
+          (this.currentAnimation.indexEnd +
+            1 -
+            this.currentAnimation.indexStart));
+    }
+    const frame = this.dataMap.frameMap.get(this.currentFrame);
+    this.currentFrameDurationRemaining = frame?.duration ?? 100;
+  }
+
   advance(duration: number) {
     if (this.speed === 0) return false;
     this.currentFrameDurationRemaining -= duration * Math.abs(this.speed);

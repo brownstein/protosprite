@@ -708,6 +708,16 @@ export class ProtoSpriteThree<
     return this;
   }
 
+  gotoFrame(frameNumber: number) {
+    this.data.animationState.gotoFrame(frameNumber);
+    return this;
+  }
+
+  gotoAnimationFrame(frameNumber: number) {
+    this.data.animationState.gotoAnimationFrame(frameNumber);
+    return this;
+  }
+
   setAnimationSpeed(speed: number) {
     this.data.animationState.speed = speed;
     return this;
