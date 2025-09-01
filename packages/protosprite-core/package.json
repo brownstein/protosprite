@@ -1,7 +1,7 @@
 {
   "name": "protosprite-core",
   "type": "module",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "A compact, protobuf based sprite exchange format",
   "main": "dist/core.js",
   "types": "dist/src/core/index.d.ts",
