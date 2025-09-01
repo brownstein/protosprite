@@ -13,6 +13,7 @@ import {
 } from "three";
 
 import { FrameData } from "../../protosprite-core/dist/src/core/data.js";
+import { createTypedEventEmitter } from "../../protosprite-core/dist/src/core/util.js";
 import fragmentShader from "./shader.frag";
 import vertexShader from "./shader.vert";
 
@@ -254,12 +255,24 @@ type ProtoSpriteLayerThreeOverride = {
   outlineThickness?: number;
 };
 
+export type ProtoSpriteThreeEventTypes = {
+  animationFrameSwapped: {
+    animation: string | null;
+    from: number;
+    to: number;
+  };
+  animationTagStarted: string;
+  animationLooped: string | null;
+};
+
 export class ProtoSpriteThree<
   TLayers extends string | never = string,
   TAnimations extends string | never = string
 > {
   public readonly mesh: Mesh;
   public readonly protoSpriteInstance: ProtoSpriteInstance;
+  public readonly events =
+    createTypedEventEmitter<ProtoSpriteThreeEventTypes>();
 
   private textureSize: Vector2;
   private mainLayer: ProtoSpriteThreeLayer;
@@ -361,24 +374,92 @@ export class ProtoSpriteThree<
       indexArr2[vi + 3] = 3;
     }
 
-    this.mesh.onBeforeRender = () => {
-      if (this.positionDirty) {
-        this.updateGeometry();
-        this.positionDirty = false;
-        this.extraDirty = true;
-      }
-      if (this.extraDirty) {
-        this.updateExtra();
-        this.extraDirty = false;
-      }
-    };
+    // Wire events.
+    this.protoSpriteInstance.animationState.events.on(
+      "FrameSwapped",
+      this.onFrameSwapped.bind(this)
+    );
+    this.protoSpriteInstance.animationState.events.on(
+      "LoopComplete",
+      this.onAnimationLooped.bind(this)
+    );
 
-    this.updateGeometry();
-    this.updateExtra();
+    // Handle pre-render events with geometry updates.
+    this.mesh.onBeforeRender = this.update.bind(this);
+
+    // Perform initial geometry update.
+    this.update();
   }
 
   dispose() {
     this.mainLayer.geom.dispose();
+  }
+
+  private onFrameSwapped({ from, to }: { from: number; to: number }) {
+    if (this.protoSpriteInstance.animationState.speed > 0) {
+      if (from < to) {
+        for (let fi = from + 1; fi <= to; fi++) {
+          const foundAnimationStart =
+            this.protoSpriteInstance.sprite.maps.reverseAnimationMap.get(fi);
+          if (foundAnimationStart) {
+            this.events.emit("animationTagStarted", foundAnimationStart.name);
+          }
+        }
+      } else {
+        for (
+          let fi = from + 1;
+          fi <=
+          (this.protoSpriteInstance.animationState.currentAnimation?.indexEnd ??
+            0);
+          fi++
+        ) {
+          const foundAnimationStart =
+            this.protoSpriteInstance.sprite.maps.reverseAnimationMap.get(fi);
+          if (foundAnimationStart) {
+            this.events.emit("animationTagStarted", foundAnimationStart.name);
+          }
+        }
+        for (
+          let fi =
+            this.protoSpriteInstance.animationState.currentAnimation
+              ?.indexStart ?? 0;
+          fi <= to;
+          fi++
+        ) {
+          const foundAnimationStart =
+            this.protoSpriteInstance.sprite.maps.reverseAnimationMap.get(fi);
+          if (foundAnimationStart) {
+            this.events.emit("animationTagStarted", foundAnimationStart.name);
+          }
+        }
+      }
+    }
+    this.events.emit("animationFrameSwapped", {
+      animation:
+        this.protoSpriteInstance.animationState.currentAnimation?.name ?? null,
+      from,
+      to
+    });
+  }
+
+  private onAnimationLooped() {
+    this.events.emit(
+      "animationLooped",
+      this.protoSpriteInstance.animationState.currentAnimation?.name ?? null
+    );
+  }
+
+  update() {
+    if (this.positionDirty) {
+      this.updateGeometry();
+      this.positionDirty = false;
+      this.extraDirty = true;
+    }
+    if (this.extraDirty) {
+      this.updateExtra();
+      this.extraDirty = false;
+    }
+    return this;
   }
 
   updateGeometry() {
@@ -668,7 +749,8 @@ export class ProtoSpriteThree<
   }
 
   private expandLayerGroups(layerNames: string | Iterable<string>) {
-    const layerNamesIterable = typeof layerNames === "string" ? [layerNames] : layerNames;
+    const layerNamesIterable =
+      typeof layerNames === "string" ? [layerNames] : layerNames;
     const dataMap = this.protoSpriteInstance.sprite.maps;
     const expandedLayerNames = new Set<string>();
     const groupIndexStack: number[] = [];
@@ -736,7 +818,11 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  fadeLayers(color: Color, opacity: number, layers: TLayers | Iterable<TLayers>) {
+  fadeLayers(
+    color: Color,
+    opacity: number,
+    layers: TLayers | Iterable<TLayers>
+  ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
@@ -764,7 +850,11 @@ export class ProtoSpriteThree<
     return this;
   }
 
-  multiplyLayers(color: Color, opacity: number, layers: TLayers | Iterable<TLayers>) {
+  multiplyLayers(
+    color: Color,
+    opacity: number,
+    layers: TLayers | Iterable<TLayers>
+  ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
@@ -817,6 +907,13 @@ export class ProtoSpriteThree<
     this.layerOverrides.clear();
     this.extraDirty = true;
     return this;
+  }
+
+  getLayerOverrides() {
+    return this.layerOverrides as Map<
+      TLayers,
+      ProtoSpriteLayerThreeOverride | undefined
+    >;
   }
 
   get size() {

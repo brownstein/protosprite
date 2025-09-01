@@ -36,6 +36,7 @@ export class ProtoSpriteDataMap {
   public layerMap = new Map<number, LayerData>();
   public layerNameMap = new Map<string, LayerData>();
   public animationMap = new Map<string, AnimationData>();
+  public reverseAnimationMap = new Map<number, AnimationData>();
 
   public layerGroupSet = new Set<number>();
   public layerGroupsDown = new Map<number, LayerData[]>();
@@ -54,6 +55,7 @@ export class ProtoSpriteDataMap {
     this.layerMap.clear();
     this.layerNameMap.clear();
     this.animationMap.clear();
+    this.reverseAnimationMap.clear();
 
     for (const frame of this.data.frames) {
       this.frameMap.set(frame.index, frame);
@@ -64,6 +66,7 @@ export class ProtoSpriteDataMap {
     }
     for (const animation of this.data.animations) {
       this.animationMap.set(animation.name, animation);
+      this.reverseAnimationMap.set(animation.indexStart, animation);
     }
 
     this.layerGroupSet.clear();
