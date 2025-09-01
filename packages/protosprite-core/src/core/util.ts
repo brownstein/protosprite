@@ -93,10 +93,10 @@ export class ProtoSpriteDataMap {
 
 export type ProtoSpriteAnimationEventTypes = {
   FrameSwapped: {
-    from: number,
-    to: number
+    from: number;
+    to: number;
   };
-  LoopComplete: void,
+  LoopComplete: void;
 };
 
 export class ProtoSpriteInstanceAnimationState {
@@ -123,9 +123,9 @@ export class ProtoSpriteInstanceAnimationState {
     let nextAnimation: AnimationData | undefined;
     if (animationName !== null) {
       const animation = this.dataMap.animationMap.get(animationName);
-      if (animation !== undefined && animation !== this.currentAnimation) {
+      if (animation !== undefined) {
         nextAnimation = animation;
-      } 
+      }
     }
     changedAnimation = nextAnimation !== this.currentAnimation;
     this.currentAnimation = nextAnimation;
@@ -179,7 +179,8 @@ export class ProtoSpriteInstanceAnimationState {
         }
       }
 
-      const frame = this.dataMap.frameMap.get(this.currentFrame) ?? new FrameData();
+      const frame =
+        this.dataMap.frameMap.get(this.currentFrame) ?? new FrameData();
       this.currentFrameDurationRemaining += frame.duration;
     }
 
