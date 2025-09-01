@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-
 import { Command } from "@commander-js/extra-typings";
 import * as aseprite from "@kayahr/aseprite";
 import childProcess from "child_process";
 import fs from "fs";
 import { Jimp } from "jimp";
 import path from "path";
-import ProtoSprite, { ProtoSpriteInstance, ProtoSpriteSheet } from "protosprite-core";
+import ProtoSprite, {
+  ProtoSpriteInstance,
+  ProtoSpriteSheet
+} from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
 import {
   packSpriteSheet,
@@ -14,8 +16,13 @@ import {
 } from "protosprite-core/transform";
 import tmpDir from "temp-dir";
 
+import {
+  ExternalSpriteSheetData,
+  SpriteSheetData,
+  isEmbeddedSpriteSheetData
+} from "../../protosprite-core/dist/src/core/data.js";
 import { findAsperiteBinary } from "./util/findAseprite.js";
-import { ExternalSpriteSheetData, isEmbeddedSpriteSheetData, SpriteSheetData } from "../../protosprite-core/dist/src/core/data.js";
+import { genTypeDefinitions } from "./util/genDefinitions.js";
 
 const program = new Command()
   .name("protosprite-cli")
@@ -25,6 +32,10 @@ const program = new Command()
   .requiredOption("-i, --input [input...]", "Process an input file.")
   .option("--output [output]", "output a ProtoSprite file.")
   .option("--external-sheet", "output an exernal sprite sheet.")
+  .option(
+    "--write-types [types-file]",
+    "write a types file for sprite animations and layers."
+  )
   .option("--preview [preview-output]", "output a preview file.")
   .option("--json", "output in JSON format")
   .option("--debug", "enable debug logging.");
@@ -37,6 +48,7 @@ type ProtoSpriteCLIArgs = {
   outputSpriteSheetFileName?: string;
   outputRenderedFileName?: string;
   outputMode?: "binary" | "json";
+  writeTypesFileName?: string;
   debug?: boolean;
 };
 
@@ -156,12 +168,17 @@ class ProtoSpriteCLI {
     ) {
       if (args.debug) console.log("Packing sprite sheet...", this.sheet);
       this.sheet.data = await packSpriteSheet(this.sheet.data);
-      this.sheet.sprites = this.sheet.data.sprites.map((data) => new ProtoSprite(data, this.sheet));
+      this.sheet.sprites = this.sheet.data.sprites.map(
+        (data) => new ProtoSprite(data, this.sheet)
+      );
       if (!this.sheet) throw new Error("Missing sprite sheet after packing.");
 
       // In sheet export mode, remove the embedded buffer.
       if (this.args.outputSpriteSheetFileName) {
-        if (isEmbeddedSpriteSheetData(this.sheet.data.pixelSource) && !!this.sheet.data.pixelSource.pngData) {
+        if (
+          isEmbeddedSpriteSheetData(this.sheet.data.pixelSource) &&
+          !!this.sheet.data.pixelSource.pngData
+        ) {
           const pngFileName = this.args.outputSpriteSheetFileName;
           fs.writeFileSync(pngFileName, this.sheet.data.pixelSource.pngData, {
             encoding: "binary"
@@ -224,6 +241,13 @@ class ProtoSpriteCLI {
         this.args.outputRenderedFileName as "string.string"
       );
     }
+
+    if (this.args.writeTypesFileName) {
+      const typeDefsStr = genTypeDefinitions(this.sheet.data);
+      fs.writeFileSync(this.args.writeTypesFileName, typeDefsStr, {
+        encoding: "utf8"
+      });
+    }
   }
 }
 
@@ -248,6 +272,8 @@ if (opts.externalSheet && args.outputProtoSpriteFileName) {
 if (typeof opts.preview === "string")
   args.outputRenderedFileName = opts.preview;
 if (opts.json) args.outputMode = "json";
+if (typeof opts.writeTypes === "string")
+  args.writeTypesFileName = opts.writeTypes;
 if (opts.debug) args.debug = true;
 
 const cli = new ProtoSpriteCLI(args);
