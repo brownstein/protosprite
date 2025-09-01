@@ -278,10 +278,12 @@ export type ProtoSpriteThreeEventTypes<
   };
 };
 
+type UnionToIntersectionHelper<U> = (U) extends (infer I)
+  ? I
+  : never;
+
 type SafeString<T extends string | void> = T extends void ? never : T;
-type SafeIterableStrings<T extends string | void> = T extends void
-  ? never
-  : Iterable<T>;
+type SafeStringIterable<T extends string | void> = Iterable<T & string>;
 
 export class ProtoSpriteThree<
   TLayers extends string | void = string,
@@ -821,7 +823,7 @@ export class ProtoSpriteThree<
 
   setLayerOpacity(
     opacity: number,
-    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
   ) {
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
@@ -853,7 +855,7 @@ export class ProtoSpriteThree<
   fadeLayers(
     color: Color,
     opacity: number,
-    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
   ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -885,7 +887,7 @@ export class ProtoSpriteThree<
   multiplyLayers(
     color: Color,
     opacity: number,
-    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
   ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -919,7 +921,7 @@ export class ProtoSpriteThree<
     thickness: number,
     color: Color,
     opacity: number,
-    layers: SafeString<TLayers> | SafeIterableStrings<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
   ) {
     const outline = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
