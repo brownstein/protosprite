@@ -1,6 +1,6 @@
 # protosprite-cli
 
-## Command line tooling for protospite.
+## Command line tooling for protosprite.
 
 ```
 Usage: protosprite-cli [options]
