@@ -1,6 +1,6 @@
 {
   "name": "protosprite-three-demo",
-  "version": "0.1.0",
+  "version": "0.1.14",
   "private": true,
   "dependencies": {
     "@bufbuild/protobuf": "^2.7.0",
