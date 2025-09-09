@@ -308,7 +308,7 @@ export function importAsepriteSheetExport(
 
   const orderedFrames = [...framesByIndex.values()];
   orderedFrames.sort((a, b) => a.index - b.index);
-  let lastFrameIndex = orderedFrames.at(0)?.index ?? 0;
+  let lastFrameIndex = 0;
   for (const orderedFrame of orderedFrames) {
     for (let fi = lastFrameIndex; fi < orderedFrame.index; fi++) {
       const missingFrame = new FrameData();
