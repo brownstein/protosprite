@@ -710,11 +710,13 @@ export class ProtoSpriteThree<
 
   gotoFrame(frameNumber: number) {
     this.data.animationState.gotoFrame(frameNumber);
+    this.positionDirty = true;
     return this;
   }
 
   gotoAnimationFrame(frameNumber: number) {
     this.data.animationState.gotoAnimationFrame(frameNumber);
+    this.positionDirty = true;
     return this;
   }
 
