@@ -11,6 +11,14 @@ import {
   SpriteData
 } from "../core/data.js";
 
+// Aseprite supports cels pending merge of https://github.com/kayahr/aseprite/pull/22.
+type AsepriteLayerWithCels = Aseprite.Layer & {
+  cels?: {
+    frame: number;
+    zIndex: number;
+  }[];
+};
+
 export class FrameNameUnknownError extends Error {
   constructor() {
     super(
@@ -197,6 +205,10 @@ export function importAsepriteSheetExport(
 
   // Build layers.
   const layersByName = new Map<string, LayerData>();
+  const celsByLayer = new Map<
+    string,
+    Map<number, NonNullable<AsepriteLayerWithCels["cels"]>[number]>
+  >();
   let getLayer: (layerName: string) => LayerData;
   if (hasLayers) {
     let layerIndex = 0;
@@ -222,6 +234,14 @@ export function importAsepriteSheetExport(
       if (parent !== undefined) {
         layer.parentIndex = parent.index;
         parent.isGroup = true;
+      }
+      const asLayerWithCells = sourceLayer as AsepriteLayerWithCels;
+      if (asLayerWithCells.cels !== undefined) {
+        for (const cel of asLayerWithCells.cels) {
+          if (!celsByLayer.has(sourceLayer.name))
+            celsByLayer.set(sourceLayer.name, new Map());
+          celsByLayer.get(sourceLayer.name)?.set(cel.frame, cel);
+        }
       }
     }
     // Assign layer getter.
@@ -282,6 +302,10 @@ export function importAsepriteSheetExport(
       frameLayer.sheetPosition.y = sourceFrame.frame.y;
       frameLayer.spritePosition.x = sourceFrame.spriteSourceSize.x;
       frameLayer.spritePosition.y = sourceFrame.spriteSourceSize.y;
+      const cel = celsByLayer.get(frameLayerName)?.get(frameNo);
+      if (cel !== undefined) {
+        frameLayer.zOffset = cel.zIndex;
+      }
       frame.layers.push(frameLayer);
     }
   } else {
@@ -302,6 +326,10 @@ export function importAsepriteSheetExport(
       frameLayer.sheetPosition.y = sourceFrame.frame.y;
       frameLayer.spritePosition.x = sourceFrame.spriteSourceSize.x;
       frameLayer.spritePosition.y = sourceFrame.spriteSourceSize.y;
+      const cel = celsByLayer.get(frameLayerName)?.get(frameNo);
+      if (cel !== undefined) {
+        frameLayer.zOffset = cel.zIndex;
+      }
       frame.layers.push(frameLayer);
     }
   }

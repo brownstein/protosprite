@@ -116,6 +116,7 @@ export class FrameLayerData {
   public size = new SizeData();
   public sheetPosition = new PositionData();
   public spritePosition = new PositionData();
+  public zOffset = 0;
 
   static fromProto(proto: Frame_FrameLayer) {
     const instance = new FrameLayerData();
@@ -129,6 +130,7 @@ export class FrameLayerData {
     instance.spritePosition = proto.spritePosition
       ? PositionData.fromProto(proto.spritePosition)
       : new PositionData();
+    instance.zOffset = proto.zOffset;
     return instance;
   }
 
@@ -138,6 +140,7 @@ export class FrameLayerData {
     proto.size = this.size.toProto();
     proto.sheetPosition = this.sheetPosition.toProto();
     proto.spritePosition = this.spritePosition.toProto();
+    proto.zOffset = this.zOffset;
     return proto;
   }
 
@@ -147,6 +150,7 @@ export class FrameLayerData {
     other.size = this.size.clone();
     other.sheetPosition = this.sheetPosition.clone();
     other.spritePosition = this.spritePosition.clone();
+    other.zOffset = this.zOffset;
     return other;
   }
 }

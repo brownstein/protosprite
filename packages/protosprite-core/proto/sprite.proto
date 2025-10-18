@@ -25,6 +25,10 @@ message Frame {
     Size size = 2;
     Position sheet_position = 3;
     Position sprite_position = 4;
+
+    // Aseprite supports the concept of z offsets for individual cels. This
+    // allows a given layer to move in front of another layer.
+    int32 z_offset = 5;
   }
 
   repeated FrameLayer layers = 2;
