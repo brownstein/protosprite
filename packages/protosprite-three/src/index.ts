@@ -529,8 +529,8 @@ export class ProtoSpriteThree<
       }
       if (groupHidden) continue;
 
-      const { size, sheetPosition, spritePosition } = layerFrame;
-      const z = layer.index * 0.05;
+      const { size, sheetPosition, spritePosition, zOffset } = layerFrame;
+      const z = (layer.index + zOffset) * 0.05;
 
       const i = drawIndex++;
 
