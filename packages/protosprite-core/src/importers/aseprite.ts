@@ -304,7 +304,17 @@ export function importAsepriteSheetExport(
       frameLayer.spritePosition.y = sourceFrame.spriteSourceSize.y;
       const cel = celsByLayer.get(frameLayerName)?.get(frameNo);
       if (cel !== undefined) {
-        frameLayer.zOffset = cel.zIndex;
+        frameLayer.zIndex = cel.zIndex;
+      }
+      let parentLayerIndex = layer.parentIndex;
+      while (parentLayerIndex !== undefined) {
+        const parentLayer = sprite.layers.at(parentLayerIndex);
+        if (parentLayer === undefined) break;
+        parentLayerIndex = parentLayer.parentIndex;
+        const parentLayerCel = celsByLayer.get(parentLayer.name)?.get(frameNo);
+        if (parentLayerCel !== undefined) {
+          frameLayer.zIndex += parentLayerCel.zIndex;
+        }
       }
       frame.layers.push(frameLayer);
     }
@@ -328,7 +338,17 @@ export function importAsepriteSheetExport(
       frameLayer.spritePosition.y = sourceFrame.spriteSourceSize.y;
       const cel = celsByLayer.get(frameLayerName)?.get(frameNo);
       if (cel !== undefined) {
-        frameLayer.zOffset = cel.zIndex;
+        frameLayer.zIndex = cel.zIndex;
+      }
+      let parentLayerIndex = layer.parentIndex;
+      while (parentLayerIndex !== undefined) {
+        const parentLayer = sprite.layers.at(parentLayerIndex);
+        if (parentLayer === undefined) break;
+        parentLayerIndex = parentLayer.parentIndex;
+        const parentLayerCel = celsByLayer.get(parentLayer.name)?.get(frameNo);
+        if (parentLayerCel !== undefined) {
+          frameLayer.zIndex += parentLayerCel.zIndex;
+        }
       }
       frame.layers.push(frameLayer);
     }

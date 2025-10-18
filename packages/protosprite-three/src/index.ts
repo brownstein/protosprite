@@ -278,9 +278,7 @@ export type ProtoSpriteThreeEventTypes<
   };
 };
 
-type UnionToIntersectionHelper<U> = (U) extends (infer I)
-  ? I
-  : never;
+type UnionToIntersectionHelper<U> = U extends infer I ? I : never;
 
 type SafeString<T extends string | void> = T extends void ? never : T;
 type SafeStringIterable<T extends string | void> = Iterable<T & string>;
@@ -404,9 +402,6 @@ export class ProtoSpriteThree<
       this.onAnimationLooped.bind(this)
     );
 
-    // Handle pre-render events with geometry updates.
-    this.mesh.onBeforeRender = this.update.bind(this);
-
     // Perform initial geometry update.
     this.update();
   }
@@ -505,6 +500,7 @@ export class ProtoSpriteThree<
     const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
     const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
     if (frame === undefined) return this;
+    const zAllocSet = new Set<number>();
     for (const layerFrame of frame.layers) {
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
@@ -529,11 +525,20 @@ export class ProtoSpriteThree<
       }
       if (groupHidden) continue;
 
-      const { size, sheetPosition, spritePosition, zOffset } = layerFrame;
-      const z = (layer.index + zOffset) * 0.05;
+      const { size, sheetPosition, spritePosition, zIndex } = layerFrame;
+
+      let z = layer.index * 0.05;
+
+      // Handle z index offsets.
+      if (zIndex !== 0) {
+        z += zIndex * 0.05;
+
+        // Fix for z-fighting.
+        while (zAllocSet.has(z)) z += zIndex > 0 ? 0.01 : -0.01;
+      }
+      zAllocSet.add(z);
 
       const i = drawIndex++;
-
       const vi = i * 12;
       const uvi = i * 8;
 
@@ -578,6 +583,7 @@ export class ProtoSpriteThree<
     geom.getAttribute("position").needsUpdate = true;
     geom.getAttribute("uv").needsUpdate = true;
     geom.setDrawRange(0, drawIndex * 6);
+
     if (geom.boundingSphere === null || geom.boundingBox === null) {
       posArr.fill(0, drawIndex * 12);
       geom.computeBoundingSphere();
@@ -698,6 +704,7 @@ export class ProtoSpriteThree<
   advance(ms: number) {
     const dirty = this.protoSpriteInstance.animationState.advance(ms);
     this.positionDirty ||= dirty;
+    this.update();
     return this;
   }
 
@@ -705,18 +712,21 @@ export class ProtoSpriteThree<
     const swapped =
       this.protoSpriteInstance.animationState.startAnimation(animationName);
     this.positionDirty ||= swapped;
+    this.update();
     return this;
   }
 
   gotoFrame(frameNumber: number) {
     this.data.animationState.gotoFrame(frameNumber);
     this.positionDirty = true;
+    this.update();
     return this;
   }
 
   gotoAnimationFrame(frameNumber: number) {
     this.data.animationState.gotoAnimationFrame(frameNumber);
     this.positionDirty = true;
+    this.update();
     return this;
   }
 
@@ -728,12 +738,14 @@ export class ProtoSpriteThree<
   hideLayers(...layerNames: SafeString<TLayers>[]) {
     for (const layerName of layerNames) this.hiddenLayerNames.add(layerName);
     this.positionDirty = true;
+    this.update();
     return this;
   }
 
   showLayers(...layerNames: SafeString<TLayers>[]) {
     for (const layerName of layerNames) this.hiddenLayerNames.delete(layerName);
     this.positionDirty = true;
+    this.update();
     return this;
   }
 
@@ -787,7 +799,7 @@ export class ProtoSpriteThree<
         .round();
     }
     this.positionDirty = true;
-    this.updateGeometry();
+    this.update();
     return true;
   }
 
@@ -830,6 +842,7 @@ export class ProtoSpriteThree<
       overrides.opacity = opacity;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -846,6 +859,7 @@ export class ProtoSpriteThree<
       overrides.opacity = opacity;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -861,6 +875,7 @@ export class ProtoSpriteThree<
       overrides.fade = fade;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -879,6 +894,7 @@ export class ProtoSpriteThree<
       overrides.fade = fade;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -893,6 +909,7 @@ export class ProtoSpriteThree<
       overrides.color = fade;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -911,6 +928,7 @@ export class ProtoSpriteThree<
       overrides.color = fade;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -926,6 +944,7 @@ export class ProtoSpriteThree<
       overrides.outline = new Vector4(color.r, color.g, color.b, opacity);
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
@@ -946,12 +965,14 @@ export class ProtoSpriteThree<
       overrides.outlineThickness = thickness;
     }
     this.extraDirty = true;
+    this.update();
     return this;
   }
 
   clearLayerAdjustments() {
     this.layerOverrides.clear();
     this.extraDirty = true;
+    this.update();
     return this;
   }
 

@@ -28,7 +28,7 @@ message Frame {
 
     // Aseprite supports the concept of z offsets for individual cels. This
     // allows a given layer to move in front of another layer.
-    int32 z_offset = 5;
+    int32 z_index = 5;
   }
 
   repeated FrameLayer layers = 2;
