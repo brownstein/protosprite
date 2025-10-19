@@ -278,8 +278,6 @@ export type ProtoSpriteThreeEventTypes<
   };
 };
 
-type UnionToIntersectionHelper<U> = U extends infer I ? I : never;
-
 type SafeString<T extends string | void> = T extends void ? never : T;
 type SafeStringIterable<T extends string | void> = Iterable<T & string>;
 

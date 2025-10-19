@@ -1,0 +1,41 @@
+.debug-attrs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.5em;
+}
+
+.attr {
+  display: flex;
+  flex-direction: row;
+  font-size: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5em;
+  text-align: left;
+}
+
+.attr.vertical {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.attr .key {
+  margin-right: 1em;
+  &::after {
+    content: ":";
+  }
+}
+
+.attr .value {
+  font-weight: bold;
+}
+
+.attr table {
+  text-align: left;
+}
+
+.attr table td {
+  min-width: 100px;
+}

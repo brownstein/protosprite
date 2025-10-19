@@ -27,6 +27,7 @@ import "./App.css";
 import birdSprite from "./bird.prs";
 import { Converter } from "./components/Converter";
 import { Renderer } from "./components/Renderer";
+import { DebugTab } from "./components/Debug";
 
 const theme = createTheme({
   palette: {
@@ -208,6 +209,7 @@ function App() {
               <Tab label="About" value="about" />
               <Tab label="Sprite Playground" value="rendering" />
               <Tab label="Import" value="import" />
+              <Tab label="Debug" value="debug" />
             </Tabs>
             {currentTab === "about" && (
               <div className="about">
@@ -398,6 +400,9 @@ function App() {
                   }}
                 />
               </div>
+            )}
+            { currentTab === "debug" && (
+              <DebugTab sprite={sprites.at(0)} />
             )}
           </div>
         </header>

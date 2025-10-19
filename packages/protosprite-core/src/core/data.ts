@@ -103,6 +103,7 @@ export class LayerData {
 
   clone() {
     const other = new LayerData();
+    other.index = this.index;
     other.name = this.name;
     other.isGroup = this.isGroup;
     other.parentIndex = this.parentIndex;
