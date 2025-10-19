@@ -70,8 +70,8 @@ export function DebugTab(props: DebugTabProps) {
               <th>Z Index</th>
             </thead>
             <tbody>
-              {currentLayers.map((layerInfo) => (
-                <tr>
+              {currentLayers.map((layerInfo, i) => (
+                <tr key={i}>
                   <td className="key">{layerInfo.layerData.name}</td>
                   <td className="value">{layerInfo.layerData.index}</td>
                   <td className="value">{layerInfo.frameLayerData.zIndex}</td>
