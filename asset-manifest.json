@@ -1,17 +1,17 @@
 {
   "files": {
     "main.css": "https://brownstein.github.io/protosprite/static/css/main.9b167c03.css",
-    "main.js": "https://brownstein.github.io/protosprite/static/js/main.f0955a70.js",
+    "main.js": "https://brownstein.github.io/protosprite/static/js/main.f39bf780.js",
     "static/js/813.e052eb85.chunk.js": "https://brownstein.github.io/protosprite/static/js/813.e052eb85.chunk.js",
     "static/js/400.e259dc73.chunk.js": "https://brownstein.github.io/protosprite/static/js/400.e259dc73.chunk.js",
     "static/media/bird.prs": "https://brownstein.github.io/protosprite/static/media/bird.162811b209c1d139035c.prs",
     "index.html": "https://brownstein.github.io/protosprite/index.html",
     "main.9b167c03.css.map": "https://brownstein.github.io/protosprite/static/css/main.9b167c03.css.map",
-    "main.f0955a70.js.map": "https://brownstein.github.io/protosprite/static/js/main.f0955a70.js.map",
+    "main.f39bf780.js.map": "https://brownstein.github.io/protosprite/static/js/main.f39bf780.js.map",
     "400.e259dc73.chunk.js.map": "https://brownstein.github.io/protosprite/static/js/400.e259dc73.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.9b167c03.css",
-    "static/js/main.f0955a70.js"
+    "static/js/main.f39bf780.js"
   ]
 }
