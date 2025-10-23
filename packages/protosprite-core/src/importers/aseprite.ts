@@ -157,6 +157,7 @@ export function importAsepriteSheetExport(
     isFirstPart = false;
   }
 
+  // Debug logging.
   if (opt?.debug) {
     console.log("Matching on parts:", matchParts.join(""));
   }
