@@ -220,6 +220,14 @@ export function importAsepriteSheetExport(
       layer.opacity = sourceLayer.opacity ?? layer.opacity;
       layer.index = layerIndex++;
       layersByName.set(sourceLayer.name, layer);
+      const asLayerWithCells = sourceLayer as AsepriteLayerWithCels;
+      if (asLayerWithCells.cels !== undefined) {
+        for (const cel of asLayerWithCells.cels) {
+          if (!celsByLayer.has(sourceLayer.name))
+            celsByLayer.set(sourceLayer.name, new Map());
+          celsByLayer.get(sourceLayer.name)?.set(cel.frame, cel);
+        }
+      }
       sprite.layers.push(layer);
     }
     // Assign parents.
@@ -235,14 +243,6 @@ export function importAsepriteSheetExport(
       if (parent !== undefined) {
         layer.parentIndex = parent.index;
         parent.isGroup = true;
-      }
-      const asLayerWithCells = sourceLayer as AsepriteLayerWithCels;
-      if (asLayerWithCells.cels !== undefined) {
-        for (const cel of asLayerWithCells.cels) {
-          if (!celsByLayer.has(sourceLayer.name))
-            celsByLayer.set(sourceLayer.name, new Map());
-          celsByLayer.get(sourceLayer.name)?.set(cel.frame, cel);
-        }
       }
     }
     // Assign layer getter.
