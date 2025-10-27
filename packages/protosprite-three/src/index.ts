@@ -829,7 +829,7 @@ export class ProtoSpriteThree<
     return expandedLayerNames;
   }
 
-  setOpacity(opacity: number) {
+  setOpacity(opacity: number, doUpdate = true) {
     for (const layer of this.data.sprite.data.layers) {
       if (layer.name === undefined) continue;
       let overrides = this.layerOverrides.get(layer.name);
@@ -840,13 +840,14 @@ export class ProtoSpriteThree<
       overrides.opacity = opacity;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
   setLayerOpacity(
     opacity: number,
-    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>,
+    doUpdate = true
   ) {
     for (const layerName of this.expandLayerGroups(layers)) {
       let overrides = this.layerOverrides.get(layerName);
@@ -857,11 +858,11 @@ export class ProtoSpriteThree<
       overrides.opacity = opacity;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
-  fadeAllLayers(color: Color, opacity: number = 1) {
+  fadeAllLayers(color: Color, opacity: number = 1, doUpdate = true) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layer of this.data.sprite.data.layers) {
       if (layer.name === undefined) continue;
@@ -873,14 +874,15 @@ export class ProtoSpriteThree<
       overrides.fade = fade;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
   fadeLayers(
     color: Color,
     opacity: number,
-    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>,
+    doUpdate = true
   ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -892,11 +894,11 @@ export class ProtoSpriteThree<
       overrides.fade = fade;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
-  multiplyAllLayers(color: Color, opacity: number = 1) {
+  multiplyAllLayers(color: Color, opacity: number = 1, doUpdate = true) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layer of this.data.sprite.data.layers) {
       let overrides = this.layerOverrides.get(layer.name);
@@ -907,14 +909,15 @@ export class ProtoSpriteThree<
       overrides.color = fade;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
   multiplyLayers(
     color: Color,
     opacity: number,
-    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>,
+    doUpdate = true
   ) {
     const fade = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -926,11 +929,16 @@ export class ProtoSpriteThree<
       overrides.color = fade;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
-  outlineAllLayers(thickness: number, color: Color, opacity: number = 1) {
+  outlineAllLayers(
+    thickness: number,
+    color: Color,
+    opacity: number = 1,
+    doUpdate = true
+  ) {
     for (const layer of this.data.sprite.data.layers) {
       if (layer.name === undefined) continue;
       let overrides = this.layerOverrides.get(layer.name);
@@ -942,7 +950,7 @@ export class ProtoSpriteThree<
       overrides.outline = new Vector4(color.r, color.g, color.b, opacity);
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
@@ -950,7 +958,8 @@ export class ProtoSpriteThree<
     thickness: number,
     color: Color,
     opacity: number,
-    layers: SafeString<TLayers> | SafeStringIterable<TLayers>
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>,
+    doUpdate = true
   ) {
     const outline = new Vector4(color.r, color.g, color.b, opacity);
     for (const layerName of this.expandLayerGroups(layers)) {
@@ -963,7 +972,7 @@ export class ProtoSpriteThree<
       overrides.outlineThickness = thickness;
     }
     this.extraDirty = true;
-    this.update();
+    if (doUpdate) this.update();
     return this;
   }
 
