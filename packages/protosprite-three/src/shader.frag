@@ -38,7 +38,7 @@ void main() {
     vec3 colorInv = white - color.rgb;
     vec3 fadeInv = white - vFade.rgb;
     colorInv *= fadeInv.rgb;
-    color.rgb = white - colorInv;
+    color.rgb = color.rgb * (1.0 - vFade.w) + (white - colorInv) * vFade.w;
   }
 
   color.w *= vOpacity;
