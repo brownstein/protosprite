@@ -24,7 +24,6 @@
     "protosprite-core": "^0.1.20",
     "protosprite-three": "^0.1.21",
     "react": "^19.1.1",
-    "react-color": "^2.19.3",
     "react-dom": "^19.1.1",
     "react-dropzone": "^14.3.8",
     "react-scripts": "5.0.1",
@@ -60,6 +59,7 @@
     "@craco/craco": "^7.1.0",
     "@types/react-color": "^3.0.13",
     "gh-pages": "^6.3.0",
+    "react-color": "^2.19.3",
     "webpack-bundle-analyzer": "^4.10.2"
   }
 }

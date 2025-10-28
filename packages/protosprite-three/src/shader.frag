@@ -30,11 +30,18 @@ void main() {
     }
     if (!isOutline) discard;
   }
-  
+
   color.rgb *= vColor;
+  
+  if (vFade.w > 0.0) {
+    vec3 white = vec3(1.0, 1.0, 1.0);
+    vec3 colorInv = white - color.rgb;
+    vec3 fadeInv = white - vFade.rgb;
+    colorInv *= fadeInv.rgb;
+    color.rgb = white - colorInv;
+  }
+
   color.w *= vOpacity;
-  color.rgb *= (1.0 - vFade.w);
-  color.rgb += vFade.rgb * vFade.w;
 
   if (isOutline) {
     color = vOutline;

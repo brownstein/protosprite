@@ -20,14 +20,14 @@ import {
   ProtoSpriteThree
 } from "protosprite-three";
 import { useEffect, useMemo, useState } from "react";
-import { SliderPicker } from "react-color";
 import { Box3, Color, Scene } from "three";
 
 import "./App.css";
 import birdSprite from "./bird.prs";
+import { ColorPicker } from "./components/ColorPicker";
 import { Converter } from "./components/Converter";
-import { Renderer } from "./components/Renderer";
 import { DebugTab } from "./components/Debug";
+import { Renderer } from "./components/Renderer";
 
 const theme = createTheme({
   palette: {
@@ -47,6 +47,11 @@ function App() {
   const [currentOpacity, setCurrentOpacity] = useState(1);
   const [currentOutlineEnabled, setCurrentOutlineEnabled] = useState(false);
   const [currentOutlineColor, setCurrentOutlineColor] = useState(0);
+  const [currentOutlineOpacity, setCurrentOutlineOpacity] = useState(1);
+  const [currentMultColor, setCurrentMultColor] = useState(0xffffff);
+  const [currentMultOpacity, setCurrentMultOpacity] = useState(0);
+  const [currentFadeColor, setCurrentFadeColor] = useState(0xffffff);
+  const [currentFadeOpacity, setCurrentFadeOpacity] = useState(0);
   const [currentSpriteCount, setCurrentSpriteCount] = useState(1);
   const [currentHiddenLayers, setCurrentHiddenLayers] = useState<
     Set<string> | undefined
@@ -59,6 +64,11 @@ function App() {
       currentOpacity: 1,
       currentOutlineEnabled: true,
       currentOutlineColor: 0,
+      currentOutlineOpacity: 1,
+      currentMultColor: 0xffffff,
+      currentMultOpacity: 0,
+      currentFadeColor: 0xffffff,
+      currentFadeOpacity: 0,
       currentSpriteCount,
       currentHiddenLayers: undefined as Set<string> | undefined
     }),
@@ -69,6 +79,11 @@ function App() {
   iState.currentOpacity = currentOpacity;
   iState.currentOutlineEnabled = currentOutlineEnabled;
   iState.currentOutlineColor = currentOutlineColor;
+  iState.currentOutlineOpacity = currentOutlineOpacity;
+  iState.currentMultColor = currentMultColor;
+  iState.currentMultOpacity = currentMultOpacity;
+  iState.currentFadeColor = currentFadeColor;
+  iState.currentFadeOpacity = currentFadeOpacity;
   iState.currentSpriteCount = currentSpriteCount;
   iState.currentHiddenLayers = currentHiddenLayers;
 
@@ -139,8 +154,20 @@ function App() {
         spriteThree.outlineAllLayers(
           1,
           new Color(iState.currentOutlineColor),
-          1
+          iState.currentOutlineOpacity
         );
+      if (iState.currentFadeColor || iState.currentFadeOpacity) {
+        spriteThree.fadeAllLayers(
+          new Color(iState.currentFadeColor),
+          iState.currentFadeOpacity
+        );
+      }
+      if (iState.currentMultColor || iState.currentMultOpacity) {
+        spriteThree.multiplyAllLayers(
+          new Color(iState.currentMultColor),
+          iState.currentMultOpacity
+        );
+      }
       spriteThree.data.animationState.speed = iState.currentPlaybackSpeed;
       if (iState.currentHiddenLayers)
         spriteThree.hideLayers(...iState.currentHiddenLayers.values());
@@ -215,22 +242,37 @@ function App() {
               <div className="about">
                 <h1>protosprite</h1>
                 <p className="explanation">
-                  A protobuf based binary encoding format for sprite sheets. This can
-                  yield significant performance gains over JSON based encodings
-                  that feature repeated strings.
+                  A protobuf based binary encoding format for sprite sheets.
+                  This can yield significant performance gains over JSON based
+                  encodings that feature repeated strings.
                 </p>
                 <h3>Packages</h3>
                 <ul className="subpackages">
                   <li>
-                    <a className="package-name" href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-core">protosprite-core</a>{" "}
+                    <a
+                      className="package-name"
+                      href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-core"
+                    >
+                      protosprite-core
+                    </a>{" "}
                     is the core implementation.
                   </li>
                   <li>
-                    <a className="package-name" href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-three">protosprite-three</a>{" "}
+                    <a
+                      className="package-name"
+                      href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-three"
+                    >
+                      protosprite-three
+                    </a>{" "}
                     is a Three.js renderer for protosprite.
                   </li>
                   <li>
-                    <a className="package-name" href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-cli">protosprite-cli</a>{" "}
+                    <a
+                      className="package-name"
+                      href="https://github.com/brownstein/protosprite/tree/main/packages/protosprite-cli"
+                    >
+                      protosprite-cli
+                    </a>{" "}
                     is a command line tool for working with protosprite.
                   </li>
                 </ul>
@@ -314,16 +356,46 @@ function App() {
                       label="Outline"
                     />
                     {currentOutlineEnabled && (
-                      <SliderPicker
-                        color={new Color(currentOutlineColor).getHexString()}
-                        onChange={(v) => {
-                          const value = new Color(v.hex);
-                          setCurrentOutlineColor(value.getHex());
+                      <ColorPicker
+                        color={currentOutlineColor}
+                        alpha={currentOutlineOpacity}
+                        onChange={(c, a) => {
+                          setCurrentOutlineColor(c);
+                          setCurrentOutlineOpacity(a);
+                          const value = new Color(c);
                           for (const sprite of sprites)
-                            sprite.outlineAllLayers(1, value, 1);
+                            sprite.outlineAllLayers(1, value, a);
                         }}
                       />
                     )}
+                  </div>
+                  <div className="param odd">
+                    <Typography>Multiply Color</Typography>
+                    <ColorPicker
+                      color={currentMultColor}
+                      alpha={currentMultOpacity}
+                      onChange={(c, a) => {
+                        setCurrentMultColor(c);
+                        setCurrentMultOpacity(a);
+                        const value = new Color(c);
+                        for (const sprite of sprites)
+                          sprite.multiplyAllLayers(value, a);
+                      }}
+                    />
+                  </div>
+                  <div className="param">
+                    <Typography>Fade Color</Typography>
+                    <ColorPicker
+                      color={currentFadeColor}
+                      alpha={currentFadeOpacity}
+                      onChange={(c, a) => {
+                        setCurrentFadeColor(c);
+                        setCurrentFadeOpacity(a);
+                        const value = new Color(c);
+                        for (const sprite of sprites)
+                          sprite.fadeAllLayers(value, a);
+                      }}
+                    />
                   </div>
                   <div className="param odd">
                     <Typography>Sprite Count</Typography>
@@ -390,7 +462,9 @@ function App() {
             )}
             {currentTab === "import" && (
               <div>
-                <h3>Preview your own files (Aseprite exports or ProtoSprite)</h3>
+                <h3>
+                  Preview your own files (Aseprite exports or ProtoSprite)
+                </h3>
                 <Converter
                   onPreviewSprite={async (sheet) => {
                     const spriteSheet = new ProtoSpriteSheet(sheet);
@@ -401,9 +475,7 @@ function App() {
                 />
               </div>
             )}
-            { currentTab === "debug" && (
-              <DebugTab sprite={sprites.at(0)} />
-            )}
+            {currentTab === "debug" && <DebugTab sprite={sprites.at(0)} />}
           </div>
         </header>
       </div>
