@@ -499,7 +499,26 @@ export class ProtoSpriteThree<
     const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
     const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
     if (frame === undefined) return this;
+    // Figure out z indices.
     const zAllocSet = new Set<number>();
+    const layerIndexToZ = new Map<number, number>();
+    for (const layerFrame of frame.layers) {
+      const layer = this.protoSpriteInstance.sprite.data.layers.at(
+        layerFrame.layerIndex
+      );
+      if (layer === undefined) continue;
+      const zIndex = layerFrame.zIndex;
+      let z = layer.index * 0.05;
+
+      // Handle z index offsets.
+      if (zIndex !== 0) {
+        z += zIndex * 0.05;
+        // Fix for z-fighting.
+        while (zAllocSet.has(z)) z += zIndex > 0 ? 0.01 : -0.01;
+      }
+      zAllocSet.add(z);
+      layerIndexToZ.set(layerFrame.layerIndex, z);
+    }
     for (const layerFrame of frame.layers) {
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
@@ -524,18 +543,9 @@ export class ProtoSpriteThree<
       }
       if (groupHidden) continue;
 
-      const { size, sheetPosition, spritePosition, zIndex } = layerFrame;
+      const { size, sheetPosition, spritePosition } = layerFrame;
 
-      let z = layer.index * 0.05;
-
-      // Handle z index offsets.
-      if (zIndex !== 0) {
-        z += zIndex * 0.05;
-
-        // Fix for z-fighting.
-        while (zAllocSet.has(z)) z += zIndex > 0 ? 0.01 : -0.01;
-      }
-      zAllocSet.add(z);
+      let z = layerIndexToZ.get(layerFrame.layerIndex) ?? 0;
 
       const i = drawIndex++;
       const vi = i * 12;
