@@ -1,5 +1,6 @@
 import { Data, ProtoSpriteInstance, ProtoSpriteSheet } from "protosprite-core";
 import {
+  Box2,
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -988,6 +989,35 @@ export class ProtoSpriteThree<
       TLayers,
       ProtoSpriteLayerThreeOverride | undefined
     >;
+  }
+
+  getLayerBounds(layers: SafeString<TLayers> | SafeStringIterable<TLayers>) {
+    const offset = this.offset;
+    const bbox = new Box2();
+    const expandedLayerSet = new Set(this.expandLayerGroups(layers));
+    const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
+    const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
+    if (frame === undefined) return bbox;
+    for (const frameLayer of frame.layers) {
+      const layer = this.protoSpriteInstance.sprite.maps.layerMap.get(
+        frameLayer.layerIndex
+      );
+      if (
+        layer === undefined ||
+        !expandedLayerSet.has(layer.name) ||
+        layer.isGroup
+      )
+        continue;
+      const v2 = new Vector2(
+        offset.x + frameLayer.spritePosition.x,
+        offset.y + frameLayer.spritePosition.y
+      );
+      bbox.expandByPoint(v2);
+      v2.x += frameLayer.size.width - 1;
+      v2.y += frameLayer.size.height - 1;
+      bbox.expandByPoint(v2);
+    }
+    return bbox;
   }
 
   get size() {
