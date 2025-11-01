@@ -1022,7 +1022,7 @@ export class ProtoSpriteThree<
 
   clone() {
     const cloned = new ProtoSpriteThree<TLayers, TAnimations>(
-      this.protoSpriteInstance,
+      new ProtoSpriteInstance(this.protoSpriteInstance.sprite),
       this.mainLayer.material
     );
     cloned.offset = this.offset.clone();
