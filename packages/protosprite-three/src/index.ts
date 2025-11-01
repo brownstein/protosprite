@@ -1020,6 +1020,31 @@ export class ProtoSpriteThree<
     return bbox;
   }
 
+  clone() {
+    const cloned = new ProtoSpriteThree<TLayers, TAnimations>(
+      this.protoSpriteInstance,
+      this.mainLayer.material
+    );
+    cloned.offset = this.offset.clone();
+    for (const hiddenLayerName of this.hiddenLayerNames) {
+      cloned.hiddenLayerNames.add(hiddenLayerName);
+    }
+    for (const [layerName, overrides] of this.layerOverrides) {
+      cloned.layerOverrides.set(layerName, {
+        ...overrides
+      });
+    }
+    cloned.extraDirty = true;
+    if (this.data.animationState.currentAnimation) {
+      cloned.gotoAnimation(
+        this.data.animationState.currentAnimation
+          .name as SafeString<TAnimations>
+      );
+    }
+    cloned.gotoFrame(this.data.animationState.currentFrame);
+    return cloned;
+  }
+
   get size() {
     return new Vector2(
       this.protoSpriteInstance.sprite.data.size.width,
