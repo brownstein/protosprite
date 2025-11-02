@@ -725,11 +725,23 @@ export class ProtoSpriteThree<
     return this;
   }
 
+  getAnimation(): SafeString<TAnimations> | null {
+    return (
+      (this.protoSpriteInstance.animationState.currentAnimation?.name as
+        | SafeString<TAnimations>
+        | undefined) ?? null
+    );
+  }
+
   gotoFrame(frameNumber: number) {
     this.data.animationState.gotoFrame(frameNumber);
     this.positionDirty = true;
     this.update();
     return this;
+  }
+
+  getFrame() {
+    return this.protoSpriteInstance.animationState.currentFrame;
   }
 
   gotoAnimationFrame(frameNumber: number) {
@@ -739,9 +751,30 @@ export class ProtoSpriteThree<
     return this;
   }
 
+  getAnimationFrame() {
+    return (
+      this.protoSpriteInstance.animationState.currentFrame -
+      (this.protoSpriteInstance.animationState.currentAnimation?.indexStart ??
+        0)
+    );
+  }
+
   setAnimationSpeed(speed: number) {
     this.data.animationState.speed = speed;
     return this;
+  }
+
+  getAnimationSpeed() {
+    return this.data.animationState.speed;
+  }
+
+  setAnimationLooping(loop: boolean) {
+    this.data.animationState.loop = loop;
+    return this;
+  }
+
+  getAnimationLooping() {
+    return this.data.animationState.loop;
   }
 
   hideLayers(...layerNames: SafeString<TLayers>[]) {

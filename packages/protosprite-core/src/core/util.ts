@@ -202,6 +202,13 @@ export class ProtoSpriteInstanceAnimationState {
         this.dataMap.frameMap.get(this.currentFrame) ?? new FrameData();
       this.currentFrameDurationRemaining += frame.duration;
     }
+    if (looped && !this.loop && this.currentAnimation !== undefined) {
+      if (this.speed > 0) {
+        this.currentFrame = this.currentAnimation.indexEnd;
+      } else {
+        this.currentFrame = this.currentAnimation.indexStart;
+      }
+    }
 
     if (changedFrame) {
       this.events.emit("FrameSwapped", {
