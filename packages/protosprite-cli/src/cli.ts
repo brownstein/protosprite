@@ -116,7 +116,7 @@ class ProtoSpriteCLI {
         let asepriteBinPath = findAsperiteBinary();
         // Replace spaces in binary path with escapes.
         if (os.platform() === "darwin") {
-          asepriteBinPath = asepriteBinPath?.replaceAll(/ /g, "\ ") ?? null;
+          asepriteBinPath = asepriteBinPath?.replaceAll(" ", "\\ ") ?? null;
         }
         const asepriteArgs = [
           "-b",
