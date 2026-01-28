@@ -1,7 +1,7 @@
 {
   "name": "protosprite-cli",
   "type": "module",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "description": "Command line utilities for working with protosprite",
   "bin": "./dist/cli.js",
   "scripts": {
@@ -26,7 +26,7 @@
     "commander": "^14.0.0",
     "jimp": "^1.6.0",
     "js-base64": "^3.7.8",
-    "protosprite-core": "^0.1.28",
+    "protosprite-core": "^0.1.30",
     "temp-dir": "^3.0.0",
     "typescript": "^5.9.2"
   },
