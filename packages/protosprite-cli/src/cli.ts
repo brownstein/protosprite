@@ -18,11 +18,12 @@ import tmpDir from "temp-dir";
 
 import {
   ExternalSpriteSheetData,
-  SpriteSheetData,
   isEmbeddedSpriteSheetData
 } from "../../protosprite-core/dist/src/core/data.js";
 import { findAsperiteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
+import os from "os";
+
 
 const program = new Command()
   .name("protosprite-cli")
@@ -112,7 +113,11 @@ class ProtoSpriteCLI {
           this.workingDirectory,
           `${inputFileParts.name}.png`
         );
-        const asepriteBinPath = findAsperiteBinary();
+        let asepriteBinPath = findAsperiteBinary();
+        // Replace spaces in binary path with escapes.
+        if (os.platform() === "darwin") {
+          asepriteBinPath = asepriteBinPath?.replaceAll(/ /g, "\ ") ?? null;
+        }
         const asepriteArgs = [
           "-b",
           "--sheet",
