@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-export function findAsperiteBinary(): string | null {
+export function findSteamAsepriteBinary(): string | null {
   const platform = os.platform();
 
   const steamInstallPath = getSteamInstallPath(platform);
