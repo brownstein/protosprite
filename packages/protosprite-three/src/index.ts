@@ -1088,6 +1088,10 @@ export class ProtoSpriteThree<
     return cloned;
   }
 
+  get centerOffset(): Vector2 {
+    return this.offset.clone();
+  }
+
   get size() {
     return new Vector2(
       this.protoSpriteInstance.sprite.data.size.width,
