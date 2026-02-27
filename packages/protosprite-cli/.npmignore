@@ -1,5 +1,4 @@
-dist
-work
 test_data
 test_output
+work
 *.prs

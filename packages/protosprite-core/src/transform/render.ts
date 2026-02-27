@@ -11,7 +11,7 @@ export async function renderSpriteInstance(
     assetPath?: string;
     debug?: boolean;
   }
-) {
+): Promise<JimpData> {
   const includeLayers = opt?.includeLayers
     ? new Set(opt.includeLayers)
     : undefined;
@@ -60,5 +60,5 @@ export async function renderSpriteInstance(
     });
   }
 
-  return resultImg;
+  return resultImg as JimpData;
 }

@@ -28,6 +28,8 @@ import {
   ExternalSpriteSheetData,
   isEmbeddedSpriteSheetData
 } from "../../protosprite-core/dist/src/core/data.js";
+
+type RenderedImage = Awaited<ReturnType<typeof renderSpriteInstance>>;
 import { findAsperiteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
 
@@ -101,7 +103,7 @@ type ProtoSpriteCLIArgs = {
 };
 
 function drawLine(
-  image: InstanceType<typeof Jimp>,
+  image: RenderedImage,
   x0: number,
   y0: number,
   x1: number,
@@ -137,7 +139,7 @@ function drawLine(
 }
 
 function drawPolygonOutline(
-  image: InstanceType<typeof Jimp>,
+  image: RenderedImage,
   vertices: Vec2Data[],
   color: number
 ) {
@@ -150,7 +152,7 @@ function drawPolygonOutline(
 }
 
 function overlayPolygonsOnImage(
-  image: InstanceType<typeof Jimp>,
+  image: RenderedImage,
   geometry: ProtoSpriteGeometry,
   spriteName: string,
   frameIndex: number

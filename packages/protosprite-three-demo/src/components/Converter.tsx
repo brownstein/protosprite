@@ -287,8 +287,8 @@ function DisplayFile(props: DisplayFileProps) {
       const objectUrl = URL.createObjectURL(blob);
       setProcessedFile({
         type: "image/png",
-        file,
-        fileSize: file.size,
+        file: iState.file,
+        fileSize: iState.file.size,
         imageUrl: objectUrl
       });
       iState.processed = true;
@@ -299,8 +299,8 @@ function DisplayFile(props: DisplayFileProps) {
       const json = JSON.parse(buff);
       setProcessedFile({
         type: "application/json",
-        file,
-        fileSize: file.size,
+        file: iState.file,
+        fileSize: iState.file.size,
         json
       });
       iState.processed = true;
@@ -326,8 +326,8 @@ function DisplayFile(props: DisplayFileProps) {
       }
       setProcessedFile({
         type: "sprite/protosprite",
-        file,
-        fileSize: file.size,
+        file: iState.file,
+        fileSize: iState.file.size,
         spriteSheetData,
         imageUrl
       });

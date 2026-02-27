@@ -6,7 +6,7 @@ import { EmbeddedSpriteSheetData, ExternalSpriteSheetData, SpriteData, isEmbedde
 export type SupportedPixelSource = EmbeddedSpriteSheetData | ExternalSpriteSheetData;
 export type JimpData = Awaited<ReturnType<typeof Jimp.read>>;
 
-export async function readPixelSourceToJimp(pixelSource: SupportedPixelSource) {
+export async function readPixelSourceToJimp(pixelSource: SupportedPixelSource): Promise<JimpData | null> {
   if (isEmbeddedSpriteSheetData(pixelSource)) {
     if (pixelSource.pngData) {
       const stringifiedBuffer = `data:image/png;base64,${Buffer.from(pixelSource.pngData).toString("base64")}`;

@@ -4,6 +4,9 @@
   "version": "0.2.0",
   "description": "Command line utilities for working with protosprite",
   "bin": "./dist/cli.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "bin": "node ./dist/cli.js",
     "build": "rm -rf dist && tsc && chmod +x dist/cli.js",
