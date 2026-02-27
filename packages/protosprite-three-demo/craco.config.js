@@ -17,6 +17,14 @@ module.exports = function ({ env }) {
   return {
     webpack: {
       plugins,
+      configure: (webpackConfig) => {
+        webpackConfig.resolve.fallback = {
+          ...webpackConfig.resolve.fallback,
+          fs: false,
+          path: false,
+        };
+        return webpackConfig;
+      },
     },
   };
 };

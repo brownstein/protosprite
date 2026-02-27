@@ -15,18 +15,24 @@ import {
 import binPack from "bin-pack";
 import { ProtoSpriteSheet } from "protosprite-core";
 import {
+  ProtoSpriteGeometry,
+  SpriteGeometryEntryData
+} from "protosprite-geom";
+import {
   ProtoSpriteSheetThree,
   ProtoSpriteSheetThreeLoader,
   ProtoSpriteThree
 } from "protosprite-three";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box3, Color, Scene } from "three";
 
 import "./App.css";
+import birdPrsg from "./bird.prsg";
 import birdSprite from "./bird.prs";
 import { ColorPicker } from "./components/ColorPicker";
 import { Converter } from "./components/Converter";
 import { DebugTab } from "./components/Debug";
+import { GeometryOverlay } from "./components/GeometryOverlay";
 import { Renderer } from "./components/Renderer";
 
 const theme = createTheme({
@@ -56,6 +62,12 @@ function App() {
   const [currentHiddenLayers, setCurrentHiddenLayers] = useState<
     Set<string> | undefined
   >();
+
+  const [geometryData, setGeometryData] = useState<
+    SpriteGeometryEntryData[] | null
+  >(null);
+  const [showGeometry, setShowGeometry] = useState(false);
+  const overlaysRef = useRef<GeometryOverlay[]>([]);
 
   const iState = useMemo(
     () => ({
@@ -90,6 +102,15 @@ function App() {
   useEffect(() => {
     loader.loadAsync(birdSprite).then(setSheet);
   }, [loader]);
+
+  useEffect(() => {
+    fetch(birdPrsg)
+      .then((res) => res.arrayBuffer())
+      .then((buf) => {
+        const geom = ProtoSpriteGeometry.fromArray(new Uint8Array(buf));
+        setGeometryData(geom.data.entries);
+      });
+  }, []);
 
   useEffect(() => {
     if (!sheet) return;
@@ -181,10 +202,45 @@ function App() {
   useEffect(() => {
     scene.clear();
     for (const sprite of sprites) scene.add(sprite.mesh);
+    // Re-add overlay meshes if active
+    for (const overlay of overlaysRef.current) {
+      scene.add(overlay.linesMesh);
+    }
     return () => {
       for (const sprite of sprites) sprite.dispose();
     };
   }, [scene, sprites]);
+
+  useEffect(() => {
+    // Clean up previous overlays
+    for (const overlay of overlaysRef.current) {
+      scene.remove(overlay.linesMesh);
+      overlay.dispose();
+    }
+    overlaysRef.current = [];
+
+    if (!showGeometry || !geometryData || sprites.length === 0) return;
+
+    const newOverlays: GeometryOverlay[] = [];
+    for (let i = 0; i < sprites.length; i++) {
+      const sprite = sprites[i];
+      const entry = geometryData[i % geometryData.length];
+      if (!entry) continue;
+      const overlay = new GeometryOverlay(sprite, entry);
+      overlay.syncPosition();
+      scene.add(overlay.linesMesh);
+      newOverlays.push(overlay);
+    }
+    overlaysRef.current = newOverlays;
+
+    return () => {
+      for (const overlay of newOverlays) {
+        scene.remove(overlay.linesMesh);
+        overlay.dispose();
+      }
+      overlaysRef.current = [];
+    };
+  }, [scene, sprites, showGeometry, geometryData]);
 
   const animationList = useMemo<string[]>(() => {
     if (!sheet) return [];
@@ -225,6 +281,9 @@ function App() {
             onBeforeRender={(delta) => {
               for (const sprite of sprites) {
                 sprite.advance(delta);
+              }
+              for (const overlay of overlaysRef.current) {
+                overlay.syncPosition();
               }
             }}
           />
@@ -456,6 +515,17 @@ function App() {
                         ))}
                       </div>
                     </Popover>
+                  </div>
+                  <div className="param odd">
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={showGeometry}
+                          onChange={(e) => setShowGeometry(e.target.checked)}
+                        />
+                      }
+                      label="Show Geometry Overlay"
+                    />
                   </div>
                 </div>
               </div>

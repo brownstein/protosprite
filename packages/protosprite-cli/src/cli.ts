@@ -4,6 +4,7 @@ import * as aseprite from "@kayahr/aseprite";
 import childProcess from "child_process";
 import fs from "fs";
 import { Jimp } from "jimp";
+import os from "os";
 import path from "path";
 import ProtoSprite, {
   ProtoSpriteInstance,
@@ -14,6 +15,13 @@ import {
   packSpriteSheet,
   renderSpriteInstance
 } from "protosprite-core/transform";
+import {
+  ProtoSpriteGeometry,
+  FrameGeometryData,
+  Vec2Data,
+  PolygonData
+} from "protosprite-geom";
+import { traceSpriteSheet } from "protosprite-geom/trace";
 import tmpDir from "temp-dir";
 
 import {
@@ -22,7 +30,6 @@ import {
 } from "../../protosprite-core/dist/src/core/data.js";
 import { findAsperiteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
-import os from "os";
 
 
 const program = new Command()
@@ -39,7 +46,38 @@ const program = new Command()
   )
   .option("--preview [preview-output]", "output a preview file.")
   .option("--json", "output in JSON format")
-  .option("--debug", "enable debug logging.");
+  .option("--debug", "enable debug logging.")
+  .option("--trace-geometry", "enable polygon tracing on the input sprites.")
+  .option(
+    "--simplify-tolerance <number>",
+    "simplification tolerance for polygon tracing.",
+    "0.5"
+  )
+  .option(
+    "--per-layer-geometry",
+    "include per-layer polygons in addition to composite-frame polygons."
+  )
+  .option(
+    "--no-composite-geometry",
+    "disable composite-frame polygons (only useful with --per-layer-geometry)."
+  )
+  .option("--output-prsg [file]", "output a .prsg geometry file.")
+  .option(
+    "--output-geom-json [file]",
+    "output traced geometry as a human-readable JSON file."
+  )
+  .option(
+    "--prsg-embed-prs",
+    "embed the .prs data inside the .prsg file."
+  )
+  .option(
+    "--export-frames [dir]",
+    "export each frame of each animation as a separate PNG."
+  )
+  .option(
+    "--overlay-polygons",
+    "when exporting frames, overlay traced polygons on the output images."
+  );
 
 type ProtoSpriteCLIArgs = {
   spriteNames?: string[];
@@ -51,11 +89,109 @@ type ProtoSpriteCLIArgs = {
   outputMode?: "binary" | "json";
   writeTypesFileName?: string;
   debug?: boolean;
+  traceGeometry?: boolean;
+  simplifyTolerance?: number;
+  perLayerGeometry?: boolean;
+  compositeGeometry?: boolean;
+  outputPrsgFileName?: string;
+  outputGeomJsonFileName?: string;
+  prsgEmbedPrs?: boolean;
+  exportFramesDir?: string;
+  overlayPolygons?: boolean;
 };
+
+function drawLine(
+  image: InstanceType<typeof Jimp>,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  color: number
+) {
+  // Bresenham's line algorithm.
+  x0 = Math.round(x0);
+  y0 = Math.round(y0);
+  x1 = Math.round(x1);
+  y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+
+  while (true) {
+    if (x0 >= 0 && x0 < image.width && y0 >= 0 && y0 < image.height) {
+      image.setPixelColor(color, x0, y0);
+    }
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x0 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y0 += sy;
+    }
+  }
+}
+
+function drawPolygonOutline(
+  image: InstanceType<typeof Jimp>,
+  vertices: Vec2Data[],
+  color: number
+) {
+  if (vertices.length < 2) return;
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i];
+    const b = vertices[(i + 1) % vertices.length];
+    drawLine(image, a.x, a.y, b.x, b.y, color);
+  }
+}
+
+function overlayPolygonsOnImage(
+  image: InstanceType<typeof Jimp>,
+  geometry: ProtoSpriteGeometry,
+  spriteName: string,
+  frameIndex: number
+): void {
+  const entry = geometry.data.entries.find(
+    (e) => e.spriteName === spriteName
+  );
+  const frameGeom = entry?.frames.find(
+    (f) => f.frameIndex === frameIndex
+  );
+  if (!frameGeom) return;
+
+  // Draw per-layer polygons.
+  for (const layerGeom of frameGeom.layers) {
+    for (const polygon of layerGeom.polygons) {
+      drawPolygonOutline(image, polygon.vertices, 0x00ff00ff); // green
+    }
+    for (const decomp of layerGeom.convexDecompositions) {
+      for (const component of decomp.components) {
+        drawPolygonOutline(image, component.vertices, 0xff0000ff); // red
+      }
+    }
+  }
+
+  // Draw composite-frame polygons if present.
+  if (frameGeom.composite) {
+    for (const polygon of frameGeom.composite.polygons) {
+      drawPolygonOutline(image, polygon.vertices, 0x00ffffff); // cyan
+    }
+    for (const decomp of frameGeom.composite.convexDecompositions) {
+      for (const component of decomp.components) {
+        drawPolygonOutline(image, component.vertices, 0xffff00ff); // yellow
+      }
+    }
+  }
+}
 
 class ProtoSpriteCLI {
   private args: ProtoSpriteCLIArgs;
   private sheet?: ProtoSpriteSheet;
+  private geometry?: ProtoSpriteGeometry;
   private workingDirectory = path.join(tmpDir, "protosprite");
   constructor(args: ProtoSpriteCLIArgs) {
     this.args = args;
@@ -82,6 +218,7 @@ class ProtoSpriteCLI {
 
     if (this.args.debug) console.log("[debug] saving files...");
     await this._saveFiles();
+    await this._exportFrames();
   }
   private async _loadFiles() {
     this.sheet = new ProtoSpriteSheet();
@@ -94,6 +231,17 @@ class ProtoSpriteCLI {
     // Process files.
     for (const inputFile of this.args.inputFiles) {
       const inputFileParts = path.parse(inputFile);
+
+      // Handle .prsg geometry files.
+      if (inputFileParts.ext === ".prsg") {
+        const rawBuff = fs.readFileSync(inputFile);
+        const geom = ProtoSpriteGeometry.fromArray(new Uint8Array(rawBuff));
+        this.sheet = geom.getSpriteSheet();
+        this.geometry = geom;
+        if (this.args.debug)
+          console.log("[debug] loaded .prsg file:", inputFile);
+        continue;
+      }
 
       // Handle aseprite files exports automatically.
       if (
@@ -155,7 +303,7 @@ class ProtoSpriteCLI {
         continue;
       }
 
-      // Handle binary ProtoSprite sheet files.
+      // Handle binary ProtoSprite sheet files (.prs or other).
       const rawBuff = fs.readFileSync(inputFile);
       this.sheet = ProtoSpriteSheet.fromArray(new Uint8Array(rawBuff));
     }
@@ -166,7 +314,9 @@ class ProtoSpriteCLI {
     // Produce packed sprite on demand.
     if (
       this.args.outputProtoSpriteFileName ||
-      this.args.outputSpriteSheetFileName
+      this.args.outputSpriteSheetFileName ||
+      this.args.outputPrsgFileName ||
+      this.args.outputGeomJsonFileName
     ) {
       if (args.debug) console.log("Packing sprite sheet...", this.sheet);
       this.sheet.data = await packSpriteSheet(this.sheet.data);
@@ -202,6 +352,65 @@ class ProtoSpriteCLI {
             encoding: "binary"
           });
         }
+      }
+
+      // Output .prsg file with traced geometry.
+      if (this.args.outputPrsgFileName) {
+        if (this.args.debug) console.log("[debug] tracing geometry...");
+        const geomData = await traceSpriteSheet(this.sheet, {
+          tolerance: this.args.simplifyTolerance ?? 0.5,
+          composite: this.args.compositeGeometry ?? true,
+          perLayer: this.args.perLayerGeometry ?? false
+        });
+
+        const geom = new ProtoSpriteGeometry(geomData);
+
+        if (this.args.prsgEmbedPrs) {
+          geom.embedSpriteSheet(this.sheet);
+        } else if (this.args.outputProtoSpriteFileName) {
+          geom.referenceSpriteSheet(this.args.outputProtoSpriteFileName);
+        }
+
+        this.geometry = geom;
+
+        if (this.args.outputMode === "json") {
+          const jsonStr = JSON.stringify(geom.toJsonObject());
+          fs.writeFileSync(this.args.outputPrsgFileName, jsonStr, {
+            encoding: "utf8"
+          });
+        } else {
+          const prsgBinary = geom.toArray();
+          fs.writeFileSync(this.args.outputPrsgFileName, prsgBinary, {
+            encoding: "binary"
+          });
+        }
+        if (this.args.debug)
+          console.log(
+            "[debug] wrote .prsg file:",
+            this.args.outputPrsgFileName
+          );
+      }
+
+      // Output geometry as human-readable JSON.
+      if (this.args.outputGeomJsonFileName) {
+        // Trace if we don't already have geometry from --output-prsg or input.
+        if (!this.geometry) {
+          if (this.args.debug) console.log("[debug] tracing geometry for JSON output...");
+          const geomData = await traceSpriteSheet(this.sheet, {
+            tolerance: this.args.simplifyTolerance ?? 1.0,
+            composite: this.args.compositeGeometry ?? false
+          });
+          this.geometry = new ProtoSpriteGeometry(geomData);
+        }
+        const jsonStr = JSON.stringify(this.geometry.toJsonObject(), null, 2);
+        fs.writeFileSync(this.args.outputGeomJsonFileName, jsonStr, {
+          encoding: "utf8"
+        });
+        if (this.args.debug)
+          console.log(
+            "[debug] wrote geometry JSON:",
+            this.args.outputGeomJsonFileName
+          );
       }
     }
 
@@ -251,6 +460,70 @@ class ProtoSpriteCLI {
       });
     }
   }
+
+  private async _exportFrames() {
+    if (!this.args.exportFramesDir || !this.sheet) return;
+
+    fs.mkdirSync(this.args.exportFramesDir, { recursive: true });
+
+    for (const sprite of this.sheet.sprites) {
+      // If sprite has animations, export frames per animation.
+      if (sprite.data.animations.length > 0) {
+        for (const animation of sprite.data.animations) {
+          for (
+            let i = animation.indexStart;
+            i <= animation.indexEnd;
+            i++
+          ) {
+            const instance = new ProtoSpriteInstance(sprite);
+            instance.animationState.currentFrame = i;
+
+            const frameImg = await renderSpriteInstance(instance);
+
+            if (this.args.overlayPolygons && this.geometry) {
+              overlayPolygonsOnImage(
+                frameImg,
+                this.geometry,
+                sprite.data.name,
+                i
+              );
+            }
+
+            const fileName = `${sprite.data.name}_${animation.name}_${i}.png`;
+            const outPath = path.join(this.args.exportFramesDir, fileName);
+            await frameImg.write(outPath as "string.string");
+
+            if (this.args.debug)
+              console.log("[debug] exported frame:", outPath);
+          }
+        }
+      } else {
+        // No animations defined, export all frames directly.
+        for (let i = 0; i < sprite.data.frames.length; i++) {
+          const instance = new ProtoSpriteInstance(sprite);
+          instance.animationState.currentFrame = i;
+
+          const frameImg = await renderSpriteInstance(instance);
+
+          if (this.args.overlayPolygons && this.geometry) {
+            overlayPolygonsOnImage(
+              frameImg,
+              this.geometry,
+              sprite.data.name,
+              i
+            );
+          }
+
+          const fileName = `${sprite.data.name}_frame_${i}.png`;
+          const outPath = path.join(this.args.exportFramesDir, fileName);
+          await frameImg.write(outPath as "string.string");
+
+          if (this.args.debug)
+            console.log("[debug] exported frame:", outPath);
+        }
+      }
+    }
+  }
 }
 
 program.parse();
@@ -277,6 +550,19 @@ if (opts.json) args.outputMode = "json";
 if (typeof opts.writeTypes === "string")
   args.writeTypesFileName = opts.writeTypes;
 if (opts.debug) args.debug = true;
+if (opts.traceGeometry) args.traceGeometry = true;
+if (opts.simplifyTolerance)
+  args.simplifyTolerance = parseFloat(opts.simplifyTolerance);
+if (opts.perLayerGeometry) args.perLayerGeometry = true;
+if (opts.compositeGeometry === false) args.compositeGeometry = false;
+if (typeof opts.outputPrsg === "string")
+  args.outputPrsgFileName = opts.outputPrsg;
+if (typeof opts.outputGeomJson === "string")
+  args.outputGeomJsonFileName = opts.outputGeomJson;
+if (opts.prsgEmbedPrs) args.prsgEmbedPrs = true;
+if (typeof opts.exportFrames === "string")
+  args.exportFramesDir = opts.exportFrames;
+if (opts.overlayPolygons) args.overlayPolygons = true;
 
 const cli = new ProtoSpriteCLI(args);
 await cli._process();
