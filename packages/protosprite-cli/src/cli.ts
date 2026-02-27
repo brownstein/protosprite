@@ -114,16 +114,13 @@ class ProtoSpriteCLI {
           `${inputFileParts.name}.png`
         );
         let asepriteBinPath = findAsperiteBinary();
-        // Replace spaces in binary path with escapes.
-        if (os.platform() === "darwin") {
-          asepriteBinPath = asepriteBinPath?.replaceAll(" ", "\\ ") ?? null;
-        }
+
         const asepriteArgs = [
           "-b",
           "--sheet",
-          workExportPngName,
+          `"${workExportPngName}"`,
           "--data",
-          workExportSheetName,
+          `"${workExportSheetName}"`,
           "--format json-hash",
           "--split-layers",
           "--all-layers",
@@ -135,9 +132,9 @@ class ProtoSpriteCLI {
           "--shape-padding 1",
           "--trim",
           '--filename-format "({layer}) {frame}"',
-          workFileName
+          `"${workFileName}"`
         ];
-        childProcess.execSync(`${asepriteBinPath} ${asepriteArgs.join(" ")}`);
+        childProcess.execSync(`"${asepriteBinPath}" ${asepriteArgs.join(" ")}`);
         const sheetData = JSON.parse(
           fs.readFileSync(workExportSheetName, { encoding: "utf8" })
         ) as aseprite.SpriteSheet;
