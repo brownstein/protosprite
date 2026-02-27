@@ -41,5 +41,6 @@
     "rollup-plugin-string": "^3.0.0",
     "three": "^0.159.0",
     "typescript": "^5.9.2"
-  }
+  },
+  "gitHead": "a7f24c356afc5fb28bc5cacc3d0ecc18ac67b5fb"
 }

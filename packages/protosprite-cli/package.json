@@ -38,5 +38,6 @@
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "prettier": "^3.2.5",
     "pretty-quick": "^4.0.0"
-  }
+  },
+  "gitHead": "a7f24c356afc5fb28bc5cacc3d0ecc18ac67b5fb"
 }
