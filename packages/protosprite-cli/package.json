@@ -1,7 +1,7 @@
 {
   "name": "protosprite-cli",
   "type": "module",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Command line utilities for working with protosprite",
   "bin": "./dist/cli.js",
   "files": [
@@ -29,8 +29,8 @@
     "commander": "^14.0.0",
     "jimp": "^1.6.0",
     "js-base64": "^3.7.8",
-    "protosprite-core": "^0.2.1",
-    "protosprite-geom": "^0.2.1",
+    "protosprite-core": "^0.2.2",
+    "protosprite-geom": "^0.2.2",
     "temp-dir": "^3.0.0",
     "typescript": "^5.9.2"
   },
@@ -39,5 +39,5 @@
     "prettier": "^3.2.5",
     "pretty-quick": "^4.0.0"
   },
-  "gitHead": "a7f24c356afc5fb28bc5cacc3d0ecc18ac67b5fb"
+  "gitHead": "842676edbb77aff985b2d3acd67324be4cecd753"
 }

@@ -18,25 +18,33 @@ message ConvexDecomposition {
   repeated Polygon components = 1;
 }
 
+// A polygon represented as indices into a vertex pool.
+message IndexedPolygon {
+  repeated int32 vertex_indices = 1;
+}
+
+// A de-duplicated (polygon, convex decomposition) pair stored in the shape pool.
+// Vertices are referenced by index into the parent SpriteGeometryEntry.vertex_pool.
+message ShapePoolEntry {
+  IndexedPolygon polygon = 1;
+  repeated IndexedPolygon convex_decomposition_components = 2;
+}
+
 // Traced geometry for one layer within one frame.
 message FrameLayerGeometry {
   int32 layer_index = 1;
 
-  // The raw traced & simplified outer polygon(s) — one per disjoint region.
-  repeated Polygon polygons = 2;
-
-  // Convex decompositions corresponding 1:1 to `polygons`.
-  repeated ConvexDecomposition convex_decompositions = 3;
+  // Fields 2 and 3 removed (previously polygons / convex_decompositions).
+  // Indices into the parent SpriteGeometryEntry.shape_pool.
+  repeated int32 shape_indices = 4;
 }
 
 // Composite geometry for the entire frame (all layers flattened).
 // Generated on demand as an alternative to per-layer geometry.
 message CompositeFrameGeometry {
-  // Traced & simplified polygons for the composited frame image.
-  repeated Polygon polygons = 1;
-
-  // Convex decompositions corresponding 1:1 to `polygons`.
-  repeated ConvexDecomposition convex_decompositions = 2;
+  // Fields 1 and 2 removed (previously polygons / convex_decompositions).
+  // Indices into the parent SpriteGeometryEntry.shape_pool.
+  repeated int32 shape_indices = 3;
 }
 
 // Geometry for an entire frame.
@@ -56,6 +64,12 @@ message SpriteGeometryEntry {
 
   // Simplification tolerance that was used to generate these polygons.
   float simplify_tolerance = 3;
+
+  // De-duplicated shape pool. Frames reference shapes by index into this pool.
+  repeated ShapePoolEntry shape_pool = 4;
+
+  // De-duplicated vertex pool. ShapePoolEntry indices reference vertices here.
+  repeated Vec2 vertex_pool = 5;
 }
 
 // Root message serialized into .prsg files.

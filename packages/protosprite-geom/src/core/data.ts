@@ -9,8 +9,12 @@ import {
   FrameGeometrySchema,
   FrameLayerGeometry,
   FrameLayerGeometrySchema,
+  IndexedPolygon,
+  IndexedPolygonSchema,
   Polygon,
   PolygonSchema,
+  ShapePoolEntry,
+  ShapePoolEntrySchema,
   SpriteGeometry,
   SpriteGeometryEntry,
   SpriteGeometryEntrySchema,
@@ -89,70 +93,102 @@ export class ConvexDecompositionData {
   }
 }
 
+export class IndexedPolygonData {
+  public vertexIndices: number[] = [];
+
+  static fromProto(proto: IndexedPolygon) {
+    const instance = new IndexedPolygonData();
+    instance.vertexIndices = [...proto.vertexIndices];
+    return instance;
+  }
+
+  toProto(protoIn?: IndexedPolygon) {
+    const proto = protoIn ?? create(IndexedPolygonSchema);
+    proto.vertexIndices = [...this.vertexIndices];
+    return proto;
+  }
+
+  clone() {
+    const other = new IndexedPolygonData();
+    other.vertexIndices = [...this.vertexIndices];
+    return other;
+  }
+}
+
+export class ShapePoolEntryData {
+  public polygon: IndexedPolygonData = new IndexedPolygonData();
+  public convexDecompositionComponents: IndexedPolygonData[] = [];
+
+  static fromProto(proto: ShapePoolEntry) {
+    const instance = new ShapePoolEntryData();
+    if (proto.polygon) {
+      instance.polygon = IndexedPolygonData.fromProto(proto.polygon);
+    }
+    instance.convexDecompositionComponents = proto.convexDecompositionComponents.map(
+      IndexedPolygonData.fromProto
+    );
+    return instance;
+  }
+
+  toProto(protoIn?: ShapePoolEntry) {
+    const proto = protoIn ?? create(ShapePoolEntrySchema);
+    proto.polygon = this.polygon.toProto();
+    proto.convexDecompositionComponents = this.convexDecompositionComponents.map((c) => c.toProto());
+    return proto;
+  }
+
+  clone() {
+    const other = new ShapePoolEntryData();
+    other.polygon = this.polygon.clone();
+    other.convexDecompositionComponents = this.convexDecompositionComponents.map((c) => c.clone());
+    return other;
+  }
+}
+
 export class FrameLayerGeometryData {
   public layerIndex = 0;
-  public polygons: PolygonData[] = [];
-  public convexDecompositions: ConvexDecompositionData[] = [];
+  public shapeIndices: number[] = [];
 
   static fromProto(proto: FrameLayerGeometry) {
     const instance = new FrameLayerGeometryData();
     instance.layerIndex = proto.layerIndex;
-    instance.polygons = proto.polygons.map(PolygonData.fromProto);
-    instance.convexDecompositions = proto.convexDecompositions.map(
-      ConvexDecompositionData.fromProto
-    );
+    instance.shapeIndices = [...proto.shapeIndices];
     return instance;
   }
 
   toProto(protoIn?: FrameLayerGeometry) {
     const proto = protoIn ?? create(FrameLayerGeometrySchema);
     proto.layerIndex = this.layerIndex;
-    proto.polygons = this.polygons.map((p) => p.toProto());
-    proto.convexDecompositions = this.convexDecompositions.map((d) =>
-      d.toProto()
-    );
+    proto.shapeIndices = [...this.shapeIndices];
     return proto;
   }
 
   clone() {
     const other = new FrameLayerGeometryData();
     other.layerIndex = this.layerIndex;
-    other.polygons = this.polygons.map((p) => p.clone());
-    other.convexDecompositions = this.convexDecompositions.map((d) =>
-      d.clone()
-    );
+    other.shapeIndices = [...this.shapeIndices];
     return other;
   }
 }
 
 export class CompositeFrameGeometryData {
-  public polygons: PolygonData[] = [];
-  public convexDecompositions: ConvexDecompositionData[] = [];
+  public shapeIndices: number[] = [];
 
   static fromProto(proto: CompositeFrameGeometry) {
     const instance = new CompositeFrameGeometryData();
-    instance.polygons = proto.polygons.map(PolygonData.fromProto);
-    instance.convexDecompositions = proto.convexDecompositions.map(
-      ConvexDecompositionData.fromProto
-    );
+    instance.shapeIndices = [...proto.shapeIndices];
     return instance;
   }
 
   toProto(protoIn?: CompositeFrameGeometry) {
     const proto = protoIn ?? create(CompositeFrameGeometrySchema);
-    proto.polygons = this.polygons.map((p) => p.toProto());
-    proto.convexDecompositions = this.convexDecompositions.map((d) =>
-      d.toProto()
-    );
+    proto.shapeIndices = [...this.shapeIndices];
     return proto;
   }
 
   clone() {
     const other = new CompositeFrameGeometryData();
-    other.polygons = this.polygons.map((p) => p.clone());
-    other.convexDecompositions = this.convexDecompositions.map((d) =>
-      d.clone()
-    );
+    other.shapeIndices = [...this.shapeIndices];
     return other;
   }
 }
@@ -193,12 +229,16 @@ export class SpriteGeometryEntryData {
   public spriteName = "";
   public frames: FrameGeometryData[] = [];
   public simplifyTolerance = 1.0;
+  public shapePool: ShapePoolEntryData[] = [];
+  public vertexPool: Vec2Data[] = [];
 
   static fromProto(proto: SpriteGeometryEntry) {
     const instance = new SpriteGeometryEntryData();
     instance.spriteName = proto.spriteName;
     instance.frames = proto.frames.map(FrameGeometryData.fromProto);
     instance.simplifyTolerance = proto.simplifyTolerance;
+    instance.shapePool = proto.shapePool.map(ShapePoolEntryData.fromProto);
+    instance.vertexPool = proto.vertexPool.map(Vec2Data.fromProto);
     return instance;
   }
 
@@ -207,6 +247,8 @@ export class SpriteGeometryEntryData {
     proto.spriteName = this.spriteName;
     proto.frames = this.frames.map((f) => f.toProto());
     proto.simplifyTolerance = this.simplifyTolerance;
+    proto.shapePool = this.shapePool.map((s) => s.toProto());
+    proto.vertexPool = this.vertexPool.map((v) => v.toProto());
     return proto;
   }
 
@@ -215,6 +257,8 @@ export class SpriteGeometryEntryData {
     other.spriteName = this.spriteName;
     other.frames = this.frames.map((f) => f.clone());
     other.simplifyTolerance = this.simplifyTolerance;
+    other.shapePool = this.shapePool.map((s) => s.clone());
+    other.vertexPool = this.vertexPool.map((v) => v.clone());
     return other;
   }
 }
