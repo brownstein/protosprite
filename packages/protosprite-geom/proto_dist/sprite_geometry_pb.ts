@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sprite_geometry.proto.
  */
 export const file_sprite_geometry: GenFile = /*@__PURE__*/
-  fileDesc("ChVzcHJpdGVfZ2VvbWV0cnkucHJvdG8SC3Byb3Rvc3ByaXRlIhwKBFZlYzISCQoBeBgBIAEoAhIJCgF5GAIgASgCIi4KB1BvbHlnb24SIwoIdmVydGljZXMYASADKAsyES5wcm90b3Nwcml0ZS5WZWMyIj8KE0NvbnZleERlY29tcG9zaXRpb24SKAoKY29tcG9uZW50cxgBIAMoCzIULnByb3Rvc3ByaXRlLlBvbHlnb24ikgEKEkZyYW1lTGF5ZXJHZW9tZXRyeRITCgtsYXllcl9pbmRleBgBIAEoBRImCghwb2x5Z29ucxgCIAMoCzIULnByb3Rvc3ByaXRlLlBvbHlnb24SPwoVY29udmV4X2RlY29tcG9zaXRpb25zGAMgAygLMiAucHJvdG9zcHJpdGUuQ29udmV4RGVjb21wb3NpdGlvbiKBAQoWQ29tcG9zaXRlRnJhbWVHZW9tZXRyeRImCghwb2x5Z29ucxgBIAMoCzIULnByb3Rvc3ByaXRlLlBvbHlnb24SPwoVY29udmV4X2RlY29tcG9zaXRpb25zGAIgAygLMiAucHJvdG9zcHJpdGUuQ29udmV4RGVjb21wb3NpdGlvbiKNAQoNRnJhbWVHZW9tZXRyeRITCgtmcmFtZV9pbmRleBgBIAEoBRIvCgZsYXllcnMYAiADKAsyHy5wcm90b3Nwcml0ZS5GcmFtZUxheWVyR2VvbWV0cnkSNgoJY29tcG9zaXRlGAMgASgLMiMucHJvdG9zcHJpdGUuQ29tcG9zaXRlRnJhbWVHZW9tZXRyeSJyChNTcHJpdGVHZW9tZXRyeUVudHJ5EhMKC3Nwcml0ZV9uYW1lGAEgASgJEioKBmZyYW1lcxgCIAMoCzIaLnByb3Rvc3ByaXRlLkZyYW1lR2VvbWV0cnkSGgoSc2ltcGxpZnlfdG9sZXJhbmNlGAMgASgCIqUBCg5TcHJpdGVHZW9tZXRyeRIxCgdlbnRyaWVzGAEgAygLMiAucHJvdG9zcHJpdGUuU3ByaXRlR2VvbWV0cnlFbnRyeRIWCgxlbWJlZGRlZF9wcnMYAiABKAxIABIbChFleHRlcm5hbF9wcnNfZmlsZRgDIAEoCUgAEhoKEGV4dGVybmFsX3Byc191cmwYBCABKAlIAEIPCg1zcHJpdGVfc291cmNlYgZwcm90bzM");
+  fileDesc("ChVzcHJpdGVfZ2VvbWV0cnkucHJvdG8SC3Byb3Rvc3ByaXRlIhwKBFZlYzISCQoBeBgBIAEoAhIJCgF5GAIgASgCIi4KB1BvbHlnb24SIwoIdmVydGljZXMYASADKAsyES5wcm90b3Nwcml0ZS5WZWMyIj8KE0NvbnZleERlY29tcG9zaXRpb24SKAoKY29tcG9uZW50cxgBIAMoCzIULnByb3Rvc3ByaXRlLlBvbHlnb24idwoOU2hhcGVQb29sRW50cnkSJQoHcG9seWdvbhgBIAEoCzIULnByb3Rvc3ByaXRlLlBvbHlnb24SPgoUY29udmV4X2RlY29tcG9zaXRpb24YAiABKAsyIC5wcm90b3Nwcml0ZS5Db252ZXhEZWNvbXBvc2l0aW9uIkAKEkZyYW1lTGF5ZXJHZW9tZXRyeRITCgtsYXllcl9pbmRleBgBIAEoBRIVCg1zaGFwZV9pbmRpY2VzGAQgAygFIi8KFkNvbXBvc2l0ZUZyYW1lR2VvbWV0cnkSFQoNc2hhcGVfaW5kaWNlcxgDIAMoBSKNAQoNRnJhbWVHZW9tZXRyeRITCgtmcmFtZV9pbmRleBgBIAEoBRIvCgZsYXllcnMYAiADKAsyHy5wcm90b3Nwcml0ZS5GcmFtZUxheWVyR2VvbWV0cnkSNgoJY29tcG9zaXRlGAMgASgLMiMucHJvdG9zcHJpdGUuQ29tcG9zaXRlRnJhbWVHZW9tZXRyeSKjAQoTU3ByaXRlR2VvbWV0cnlFbnRyeRITCgtzcHJpdGVfbmFtZRgBIAEoCRIqCgZmcmFtZXMYAiADKAsyGi5wcm90b3Nwcml0ZS5GcmFtZUdlb21ldHJ5EhoKEnNpbXBsaWZ5X3RvbGVyYW5jZRgDIAEoAhIvCgpzaGFwZV9wb29sGAQgAygLMhsucHJvdG9zcHJpdGUuU2hhcGVQb29sRW50cnkipQEKDlNwcml0ZUdlb21ldHJ5EjEKB2VudHJpZXMYASADKAsyIC5wcm90b3Nwcml0ZS5TcHJpdGVHZW9tZXRyeUVudHJ5EhYKDGVtYmVkZGVkX3BycxgCIAEoDEgAEhsKEWV4dGVybmFsX3Byc19maWxlGAMgASgJSAASGgoQZXh0ZXJuYWxfcHJzX3VybBgEIAEoCUgAQg8KDXNwcml0ZV9zb3VyY2ViBnByb3RvMw");
 
 /**
  * A 2D point with float precision (polygon vertices need sub-pixel accuracy
@@ -118,6 +118,47 @@ export const ConvexDecompositionSchema: GenMessage<ConvexDecomposition, {jsonTyp
   messageDesc(file_sprite_geometry, 2);
 
 /**
+ * A de-duplicated (polygon, convex decomposition) pair stored in the shape pool.
+ *
+ * @generated from message protosprite.ShapePoolEntry
+ */
+export type ShapePoolEntry = Message<"protosprite.ShapePoolEntry"> & {
+  /**
+   * @generated from field: protosprite.Polygon polygon = 1;
+   */
+  polygon?: Polygon;
+
+  /**
+   * @generated from field: protosprite.ConvexDecomposition convex_decomposition = 2;
+   */
+  convexDecomposition?: ConvexDecomposition;
+};
+
+/**
+ * A de-duplicated (polygon, convex decomposition) pair stored in the shape pool.
+ *
+ * @generated from message protosprite.ShapePoolEntry
+ */
+export type ShapePoolEntryJson = {
+  /**
+   * @generated from field: protosprite.Polygon polygon = 1;
+   */
+  polygon?: PolygonJson;
+
+  /**
+   * @generated from field: protosprite.ConvexDecomposition convex_decomposition = 2;
+   */
+  convexDecomposition?: ConvexDecompositionJson;
+};
+
+/**
+ * Describes the message protosprite.ShapePoolEntry.
+ * Use `create(ShapePoolEntrySchema)` to create a new message.
+ */
+export const ShapePoolEntrySchema: GenMessage<ShapePoolEntry, {jsonType: ShapePoolEntryJson}> = /*@__PURE__*/
+  messageDesc(file_sprite_geometry, 3);
+
+/**
  * Traced geometry for one layer within one frame.
  *
  * @generated from message protosprite.FrameLayerGeometry
@@ -129,18 +170,12 @@ export type FrameLayerGeometry = Message<"protosprite.FrameLayerGeometry"> & {
   layerIndex: number;
 
   /**
-   * The raw traced & simplified outer polygon(s) — one per disjoint region.
+   * Fields 2 and 3 removed (previously polygons / convex_decompositions).
+   * Indices into the parent SpriteGeometryEntry.shape_pool.
    *
-   * @generated from field: repeated protosprite.Polygon polygons = 2;
+   * @generated from field: repeated int32 shape_indices = 4;
    */
-  polygons: Polygon[];
-
-  /**
-   * Convex decompositions corresponding 1:1 to `polygons`.
-   *
-   * @generated from field: repeated protosprite.ConvexDecomposition convex_decompositions = 3;
-   */
-  convexDecompositions: ConvexDecomposition[];
+  shapeIndices: number[];
 };
 
 /**
@@ -155,18 +190,12 @@ export type FrameLayerGeometryJson = {
   layerIndex?: number;
 
   /**
-   * The raw traced & simplified outer polygon(s) — one per disjoint region.
+   * Fields 2 and 3 removed (previously polygons / convex_decompositions).
+   * Indices into the parent SpriteGeometryEntry.shape_pool.
    *
-   * @generated from field: repeated protosprite.Polygon polygons = 2;
+   * @generated from field: repeated int32 shape_indices = 4;
    */
-  polygons?: PolygonJson[];
-
-  /**
-   * Convex decompositions corresponding 1:1 to `polygons`.
-   *
-   * @generated from field: repeated protosprite.ConvexDecomposition convex_decompositions = 3;
-   */
-  convexDecompositions?: ConvexDecompositionJson[];
+  shapeIndices?: number[];
 };
 
 /**
@@ -174,7 +203,7 @@ export type FrameLayerGeometryJson = {
  * Use `create(FrameLayerGeometrySchema)` to create a new message.
  */
 export const FrameLayerGeometrySchema: GenMessage<FrameLayerGeometry, {jsonType: FrameLayerGeometryJson}> = /*@__PURE__*/
-  messageDesc(file_sprite_geometry, 3);
+  messageDesc(file_sprite_geometry, 4);
 
 /**
  * Composite geometry for the entire frame (all layers flattened).
@@ -184,18 +213,12 @@ export const FrameLayerGeometrySchema: GenMessage<FrameLayerGeometry, {jsonType:
  */
 export type CompositeFrameGeometry = Message<"protosprite.CompositeFrameGeometry"> & {
   /**
-   * Traced & simplified polygons for the composited frame image.
+   * Fields 1 and 2 removed (previously polygons / convex_decompositions).
+   * Indices into the parent SpriteGeometryEntry.shape_pool.
    *
-   * @generated from field: repeated protosprite.Polygon polygons = 1;
+   * @generated from field: repeated int32 shape_indices = 3;
    */
-  polygons: Polygon[];
-
-  /**
-   * Convex decompositions corresponding 1:1 to `polygons`.
-   *
-   * @generated from field: repeated protosprite.ConvexDecomposition convex_decompositions = 2;
-   */
-  convexDecompositions: ConvexDecomposition[];
+  shapeIndices: number[];
 };
 
 /**
@@ -206,18 +229,12 @@ export type CompositeFrameGeometry = Message<"protosprite.CompositeFrameGeometry
  */
 export type CompositeFrameGeometryJson = {
   /**
-   * Traced & simplified polygons for the composited frame image.
+   * Fields 1 and 2 removed (previously polygons / convex_decompositions).
+   * Indices into the parent SpriteGeometryEntry.shape_pool.
    *
-   * @generated from field: repeated protosprite.Polygon polygons = 1;
+   * @generated from field: repeated int32 shape_indices = 3;
    */
-  polygons?: PolygonJson[];
-
-  /**
-   * Convex decompositions corresponding 1:1 to `polygons`.
-   *
-   * @generated from field: repeated protosprite.ConvexDecomposition convex_decompositions = 2;
-   */
-  convexDecompositions?: ConvexDecompositionJson[];
+  shapeIndices?: number[];
 };
 
 /**
@@ -225,7 +242,7 @@ export type CompositeFrameGeometryJson = {
  * Use `create(CompositeFrameGeometrySchema)` to create a new message.
  */
 export const CompositeFrameGeometrySchema: GenMessage<CompositeFrameGeometry, {jsonType: CompositeFrameGeometryJson}> = /*@__PURE__*/
-  messageDesc(file_sprite_geometry, 4);
+  messageDesc(file_sprite_geometry, 5);
 
 /**
  * Geometry for an entire frame.
@@ -282,7 +299,7 @@ export type FrameGeometryJson = {
  * Use `create(FrameGeometrySchema)` to create a new message.
  */
 export const FrameGeometrySchema: GenMessage<FrameGeometry, {jsonType: FrameGeometryJson}> = /*@__PURE__*/
-  messageDesc(file_sprite_geometry, 5);
+  messageDesc(file_sprite_geometry, 6);
 
 /**
  * Top-level geometry container for one sprite.
@@ -306,6 +323,13 @@ export type SpriteGeometryEntry = Message<"protosprite.SpriteGeometryEntry"> & {
    * @generated from field: float simplify_tolerance = 3;
    */
   simplifyTolerance: number;
+
+  /**
+   * De-duplicated shape pool. Frames reference shapes by index into this pool.
+   *
+   * @generated from field: repeated protosprite.ShapePoolEntry shape_pool = 4;
+   */
+  shapePool: ShapePoolEntry[];
 };
 
 /**
@@ -330,6 +354,13 @@ export type SpriteGeometryEntryJson = {
    * @generated from field: float simplify_tolerance = 3;
    */
   simplifyTolerance?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * De-duplicated shape pool. Frames reference shapes by index into this pool.
+   *
+   * @generated from field: repeated protosprite.ShapePoolEntry shape_pool = 4;
+   */
+  shapePool?: ShapePoolEntryJson[];
 };
 
 /**
@@ -337,7 +368,7 @@ export type SpriteGeometryEntryJson = {
  * Use `create(SpriteGeometryEntrySchema)` to create a new message.
  */
 export const SpriteGeometryEntrySchema: GenMessage<SpriteGeometryEntry, {jsonType: SpriteGeometryEntryJson}> = /*@__PURE__*/
-  messageDesc(file_sprite_geometry, 6);
+  messageDesc(file_sprite_geometry, 7);
 
 /**
  * Root message serialized into .prsg files.
@@ -420,5 +451,5 @@ export type SpriteGeometryJson = {
  * Use `create(SpriteGeometrySchema)` to create a new message.
  */
 export const SpriteGeometrySchema: GenMessage<SpriteGeometry, {jsonType: SpriteGeometryJson}> = /*@__PURE__*/
-  messageDesc(file_sprite_geometry, 7);
+  messageDesc(file_sprite_geometry, 8);
 

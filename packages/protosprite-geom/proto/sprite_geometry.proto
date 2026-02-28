@@ -18,25 +18,27 @@ message ConvexDecomposition {
   repeated Polygon components = 1;
 }
 
+// A de-duplicated (polygon, convex decomposition) pair stored in the shape pool.
+message ShapePoolEntry {
+  Polygon polygon = 1;
+  ConvexDecomposition convex_decomposition = 2;
+}
+
 // Traced geometry for one layer within one frame.
 message FrameLayerGeometry {
   int32 layer_index = 1;
 
-  // The raw traced & simplified outer polygon(s) — one per disjoint region.
-  repeated Polygon polygons = 2;
-
-  // Convex decompositions corresponding 1:1 to `polygons`.
-  repeated ConvexDecomposition convex_decompositions = 3;
+  // Fields 2 and 3 removed (previously polygons / convex_decompositions).
+  // Indices into the parent SpriteGeometryEntry.shape_pool.
+  repeated int32 shape_indices = 4;
 }
 
 // Composite geometry for the entire frame (all layers flattened).
 // Generated on demand as an alternative to per-layer geometry.
 message CompositeFrameGeometry {
-  // Traced & simplified polygons for the composited frame image.
-  repeated Polygon polygons = 1;
-
-  // Convex decompositions corresponding 1:1 to `polygons`.
-  repeated ConvexDecomposition convex_decompositions = 2;
+  // Fields 1 and 2 removed (previously polygons / convex_decompositions).
+  // Indices into the parent SpriteGeometryEntry.shape_pool.
+  repeated int32 shape_indices = 3;
 }
 
 // Geometry for an entire frame.
@@ -56,6 +58,9 @@ message SpriteGeometryEntry {
 
   // Simplification tolerance that was used to generate these polygons.
   float simplify_tolerance = 3;
+
+  // De-duplicated shape pool. Frames reference shapes by index into this pool.
+  repeated ShapePoolEntry shape_pool = 4;
 }
 
 // Root message serialized into .prsg files.

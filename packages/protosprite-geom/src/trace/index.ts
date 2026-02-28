@@ -13,6 +13,7 @@ import {
   FrameGeometryData,
   FrameLayerGeometryData,
   PolygonData,
+  ShapePoolEntryData,
   SpriteGeometryData,
   SpriteGeometryEntryData
 } from "../core/data.js";
@@ -90,6 +91,34 @@ function traceAndProcess(
   return { polygons, convexDecompositions };
 }
 
+class ShapePoolBuilder {
+  private pool: ShapePoolEntryData[] = [];
+  private hashMap = new Map<string, number>();
+
+  private hashPolygon(polygon: PolygonData): string {
+    return polygon.vertices.map((v) => `${v.x},${v.y}`).join(";");
+  }
+
+  addShape(polygon: PolygonData, decomposition: ConvexDecompositionData): number {
+    const key = this.hashPolygon(polygon);
+    const existing = this.hashMap.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const index = this.pool.length;
+    const entry = new ShapePoolEntryData();
+    entry.polygon = polygon;
+    entry.convexDecomposition = decomposition;
+    this.pool.push(entry);
+    this.hashMap.set(key, index);
+    return index;
+  }
+
+  getPool(): ShapePoolEntryData[] {
+    return this.pool;
+  }
+}
+
 export async function traceSpriteSheet(
   sheet: ProtoSpriteSheet,
   options: TraceSpriteSheetOptions
@@ -114,6 +143,8 @@ export async function traceSpriteSheet(
     const entry = new SpriteGeometryEntryData();
     entry.spriteName = sprite.data.name;
     entry.simplifyTolerance = tolerance;
+
+    const poolBuilder = new ShapePoolBuilder();
 
     // Try sprite-level pixel source, fall back to sheet image.
     let spriteImg = sheetImg;
@@ -176,8 +207,11 @@ export async function traceSpriteSheet(
             }
           }
 
-          layerGeom.polygons = polygons;
-          layerGeom.convexDecompositions = convexDecompositions;
+          const shapeIndices: number[] = [];
+          for (let i = 0; i < polygons.length; i++) {
+            shapeIndices.push(poolBuilder.addShape(polygons[i], convexDecompositions[i]));
+          }
+          layerGeom.shapeIndices = shapeIndices;
           frameGeom.layers.push(layerGeom);
         }
       }
@@ -202,14 +236,18 @@ export async function traceSpriteSheet(
         );
 
         const compositeGeom = new CompositeFrameGeometryData();
-        compositeGeom.polygons = polygons;
-        compositeGeom.convexDecompositions = convexDecompositions;
+        const shapeIndices: number[] = [];
+        for (let i = 0; i < polygons.length; i++) {
+          shapeIndices.push(poolBuilder.addShape(polygons[i], convexDecompositions[i]));
+        }
+        compositeGeom.shapeIndices = shapeIndices;
         frameGeom.composite = compositeGeom;
       }
 
       entry.frames.push(frameGeom);
     }
 
+    entry.shapePool = poolBuilder.getPool();
     result.entries.push(entry);
   }
 

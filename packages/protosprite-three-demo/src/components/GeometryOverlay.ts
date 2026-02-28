@@ -44,7 +44,10 @@ export class GeometryOverlay {
     }
 
     const offset = this.sprite.centerOffset;
-    const polygons = frameGeom.composite.polygons;
+    const pool = this.geomEntry.shapePool;
+    const polygons = frameGeom.composite.shapeIndices.map(
+      (idx) => pool[idx].polygon
+    );
 
     // Count total line segments needed
     let segmentCount = 0;

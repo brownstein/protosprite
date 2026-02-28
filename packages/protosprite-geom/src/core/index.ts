@@ -8,6 +8,7 @@ export {
   Vec2Data,
   PolygonData,
   ConvexDecompositionData,
+  ShapePoolEntryData,
   FrameLayerGeometryData,
   CompositeFrameGeometryData,
   FrameGeometryData,
@@ -16,3 +17,9 @@ export {
 } from "./data.js";
 
 export type { SpriteSourceData } from "./data.js";
+
+export type {
+  ResolvedLayerGeometry,
+  ResolvedCompositeGeometry,
+  ResolvedFrameGeometry
+} from "./protosprite-geom.js";
