@@ -682,11 +682,13 @@ function analyzePrsg(filePath: string, fileSize: number, geom: ProtoSpriteGeomet
 
     // Compute totals from the shape pool.
     const uniqueShapes = entry.shapePool.length;
-    let totalPolygons = 0;
-    let totalVertices = 0;
+    const uniqueVertices = entry.vertexPool.length;
+    let totalVertexIndices = 0;
     for (const shape of entry.shapePool) {
-      totalPolygons++;
-      totalVertices += shape.polygon.vertices.length;
+      totalVertexIndices += shape.polygon.vertexIndices.length;
+      for (const comp of shape.convexDecompositionComponents) {
+        totalVertexIndices += comp.vertexIndices.length;
+      }
     }
 
     return {
@@ -697,8 +699,8 @@ function analyzePrsg(filePath: string, fileSize: number, geom: ProtoSpriteGeomet
       hasCompositeGeometry,
       uniqueShapes,
       totalShapeReferences,
-      totalPolygons,
-      totalVertices
+      uniqueVertices,
+      totalVertexIndices
     };
   });
 
@@ -745,7 +747,8 @@ function printPrsgAnalysis(result: ReturnType<typeof analyzePrsg>) {
     console.log(`      Has composite geometry: ${entry.hasCompositeGeometry ? "yes" : "no"}`);
     console.log(`      Unique shapes: ${entry.uniqueShapes}`);
     console.log(`      Total shape references: ${entry.totalShapeReferences}`);
-    console.log(`      Total polygons: ${entry.totalPolygons}, total vertices: ${entry.totalVertices}`);
+    console.log(`      Unique vertices: ${entry.uniqueVertices}`);
+    console.log(`      Total vertex indices: ${entry.totalVertexIndices}`);
   }
 }
 

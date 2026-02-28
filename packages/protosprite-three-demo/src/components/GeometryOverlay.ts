@@ -44,24 +44,26 @@ export class GeometryOverlay {
     }
 
     const offset = this.sprite.centerOffset;
-    const pool = this.geomEntry.shapePool;
-    const polygons = frameGeom.composite.shapeIndices.map(
-      (idx) => pool[idx].polygon
-    );
+    const shapePool = this.geomEntry.shapePool;
+    const vertexPool = this.geomEntry.vertexPool;
+
+    // Resolve indexed polygons through vertex pool
+    const resolvedPolygons = frameGeom.composite.shapeIndices.map((idx) => {
+      const shape = shapePool[idx];
+      return shape.polygon.vertexIndices.map((vi) => vertexPool[vi]);
+    });
 
     // Count total line segments needed
     let segmentCount = 0;
-    for (const polygon of polygons) {
-      const vLen = polygon.vertices.length;
-      if (vLen >= 2) segmentCount += vLen; // each edge = 1 segment, closing edge included
+    for (const verts of resolvedPolygons) {
+      if (verts.length >= 2) segmentCount += verts.length;
     }
 
     const posArr = new Float32Array(segmentCount * 2 * 3); // 2 verts per segment, 3 components
     let vi = 0;
     const z = 0.5;
 
-    for (const polygon of polygons) {
-      const verts = polygon.vertices;
+    for (const verts of resolvedPolygons) {
       if (verts.length < 2) continue;
       for (let i = 0; i < verts.length; i++) {
         const curr = verts[i];

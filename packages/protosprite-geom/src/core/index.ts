@@ -8,6 +8,7 @@ export {
   Vec2Data,
   PolygonData,
   ConvexDecompositionData,
+  IndexedPolygonData,
   ShapePoolEntryData,
   FrameLayerGeometryData,
   CompositeFrameGeometryData,

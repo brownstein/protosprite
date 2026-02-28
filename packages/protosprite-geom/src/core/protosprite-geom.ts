@@ -3,9 +3,11 @@ import { ProtoSpriteSheet } from "protosprite-core";
 import { SpriteGeometrySchema } from "../../proto_dist/sprite_geometry_pb.js";
 import {
   ConvexDecompositionData,
+  IndexedPolygonData,
   PolygonData,
   SpriteGeometryData,
-  SpriteGeometryEntryData
+  SpriteGeometryEntryData,
+  Vec2Data
 } from "./data.js";
 import fs from "fs";
 
@@ -88,16 +90,32 @@ export class ProtoSpriteGeometry {
     const frameGeom = entry.frames.find((f) => f.frameIndex === frameIndex);
     if (!frameGeom) return undefined;
 
-    const pool = entry.shapePool;
+    const shapePool = entry.shapePool;
+    const vertexPool = entry.vertexPool;
+
+    const resolveIndexedPolygon = (indexed: IndexedPolygonData): PolygonData => {
+      const poly = new PolygonData();
+      poly.vertices = indexed.vertexIndices.map((vi) => vertexPool[vi]);
+      return poly;
+    };
+
+    const resolveShape = (idx: number): { polygon: PolygonData; decomposition: ConvexDecompositionData } | undefined => {
+      const shape = shapePool[idx];
+      if (!shape) return undefined;
+      const polygon = resolveIndexedPolygon(shape.polygon);
+      const decomposition = new ConvexDecompositionData();
+      decomposition.components = shape.convexDecompositionComponents.map(resolveIndexedPolygon);
+      return { polygon, decomposition };
+    };
 
     const layers: ResolvedLayerGeometry[] = frameGeom.layers.map((layer) => {
       const polygons: PolygonData[] = [];
       const convexDecompositions: ConvexDecompositionData[] = [];
       for (const idx of layer.shapeIndices) {
-        const shape = pool[idx];
-        if (shape) {
-          polygons.push(shape.polygon);
-          convexDecompositions.push(shape.convexDecomposition);
+        const resolved = resolveShape(idx);
+        if (resolved) {
+          polygons.push(resolved.polygon);
+          convexDecompositions.push(resolved.decomposition);
         }
       }
       return { layerIndex: layer.layerIndex, polygons, convexDecompositions };
@@ -108,10 +126,10 @@ export class ProtoSpriteGeometry {
       const polygons: PolygonData[] = [];
       const convexDecompositions: ConvexDecompositionData[] = [];
       for (const idx of frameGeom.composite.shapeIndices) {
-        const shape = pool[idx];
-        if (shape) {
-          polygons.push(shape.polygon);
-          convexDecompositions.push(shape.convexDecomposition);
+        const resolved = resolveShape(idx);
+        if (resolved) {
+          polygons.push(resolved.polygon);
+          convexDecompositions.push(resolved.decomposition);
         }
       }
       composite = { polygons, convexDecompositions };

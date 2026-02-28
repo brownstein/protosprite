@@ -18,10 +18,16 @@ message ConvexDecomposition {
   repeated Polygon components = 1;
 }
 
+// A polygon represented as indices into a vertex pool.
+message IndexedPolygon {
+  repeated int32 vertex_indices = 1;
+}
+
 // A de-duplicated (polygon, convex decomposition) pair stored in the shape pool.
+// Vertices are referenced by index into the parent SpriteGeometryEntry.vertex_pool.
 message ShapePoolEntry {
-  Polygon polygon = 1;
-  ConvexDecomposition convex_decomposition = 2;
+  IndexedPolygon polygon = 1;
+  repeated IndexedPolygon convex_decomposition_components = 2;
 }
 
 // Traced geometry for one layer within one frame.
@@ -61,6 +67,9 @@ message SpriteGeometryEntry {
 
   // De-duplicated shape pool. Frames reference shapes by index into this pool.
   repeated ShapePoolEntry shape_pool = 4;
+
+  // De-duplicated vertex pool. ShapePoolEntry indices reference vertices here.
+  repeated Vec2 vertex_pool = 5;
 }
 
 // Root message serialized into .prsg files.
