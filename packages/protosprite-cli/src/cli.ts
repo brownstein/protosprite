@@ -29,6 +29,7 @@ import {
 } from "../../protosprite-core/dist/src/core/data.js";
 
 type RenderedImage = Awaited<ReturnType<typeof renderSpriteInstance>>;
+import { compressPng } from "./util/compressPng.js";
 import { findAsperiteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
 
@@ -135,6 +136,8 @@ type ProtoSpriteCLIArgs = {
   prsgEmbedPrs?: boolean;
   exportFramesDir?: string;
   overlayPolygons?: boolean;
+  compress?: boolean;
+  compressionLevel?: number;
 };
 
 class ProtoSpriteCLI {
@@ -274,6 +277,27 @@ class ProtoSpriteCLI {
       );
       if (!this.sheet) throw new Error("Missing sprite sheet after packing.");
 
+      // Compress embedded PNG data if --compress is active.
+      if (
+        this.args.compress &&
+        isEmbeddedSpriteSheetData(this.sheet.data.pixelSource) &&
+        this.sheet.data.pixelSource.pngData
+      ) {
+        const originalSize = this.sheet.data.pixelSource.pngData.byteLength;
+        this.sheet.data.pixelSource.pngData = await compressPng(
+          this.sheet.data.pixelSource.pngData,
+          this.args.compressionLevel
+        );
+        const compressedSize = this.sheet.data.pixelSource.pngData.byteLength;
+        const reduction = (
+          ((originalSize - compressedSize) / originalSize) *
+          100
+        ).toFixed(1);
+        console.log(
+          `PNG compression: ${formatBytes(originalSize)} bytes -> ${formatBytes(compressedSize)} bytes (${reduction}% reduction)`
+        );
+      }
+
       // In sheet export mode, remove the embedded buffer.
       if (this.args.outputSpriteSheetFileName) {
         if (
@@ -410,6 +434,42 @@ class ProtoSpriteCLI {
     }
   }
 
+  private async _writeFramePng(
+    frameImg: RenderedImage,
+    outPath: string
+  ) {
+    if (this.args.compress) {
+      // Write uncompressed version with _uncompressed suffix.
+      const parsed = path.parse(outPath);
+      const uncompressedPath = path.join(
+        parsed.dir,
+        `${parsed.name}_uncompressed${parsed.ext}`
+      );
+      await frameImg.write(uncompressedPath as "string.string");
+
+      // Write compressed version at the normal path.
+      const pngBuffer = await frameImg.getBuffer("image/png");
+      const compressed = await compressPng(
+        new Uint8Array(pngBuffer),
+        this.args.compressionLevel
+      );
+      fs.writeFileSync(outPath, compressed, { encoding: "binary" });
+
+      if (this.args.debug) {
+        const reduction = (
+          ((pngBuffer.byteLength - compressed.byteLength) /
+            pngBuffer.byteLength) *
+          100
+        ).toFixed(1);
+        console.log(
+          `[debug] frame ${path.basename(outPath)}: ${formatBytes(pngBuffer.byteLength)} -> ${formatBytes(compressed.byteLength)} bytes (${reduction}% reduction)`
+        );
+      }
+    } else {
+      await frameImg.write(outPath as "string.string");
+    }
+  }
+
   private async _exportFrames() {
     if (!this.args.exportFramesDir || !this.sheet) return;
 
@@ -440,7 +500,7 @@ class ProtoSpriteCLI {
 
             const fileName = `${sprite.data.name}_${animation.name}_${i}.png`;
             const outPath = path.join(this.args.exportFramesDir, fileName);
-            await frameImg.write(outPath as "string.string");
+            await this._writeFramePng(frameImg, outPath);
 
             if (this.args.debug)
               console.log("[debug] exported frame:", outPath);
@@ -465,7 +525,7 @@ class ProtoSpriteCLI {
 
           const fileName = `${sprite.data.name}_frame_${i}.png`;
           const outPath = path.join(this.args.exportFramesDir, fileName);
-          await frameImg.write(outPath as "string.string");
+          await this._writeFramePng(frameImg, outPath);
 
           if (this.args.debug)
             console.log("[debug] exported frame:", outPath);
@@ -804,6 +864,15 @@ program
     "--overlay-polygons",
     "when exporting frames, overlay traced polygons on the output images."
   )
+  .option(
+    "--compression <level>",
+    "set PNG compression level (max colors, 2-256). enabled by default.",
+    "256"
+  )
+  .option(
+    "--uncompressed",
+    "disable PNG compression."
+  )
   .action(async (opts) => {
     let args: ProtoSpriteCLIArgs = {
       inputFiles: []
@@ -839,6 +908,12 @@ program
     if (typeof opts.exportFrames === "string")
       args.exportFramesDir = opts.exportFrames;
     if (opts.overlayPolygons) args.overlayPolygons = true;
+    if (opts.uncompressed) {
+      args.compress = false;
+    } else {
+      args.compress = true;
+      args.compressionLevel = parseInt(opts.compression, 10);
+    }
 
     const cli = new ProtoSpriteCLI(args);
     await cli._process();
