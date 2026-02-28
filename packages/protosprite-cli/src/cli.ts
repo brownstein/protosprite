@@ -137,6 +137,7 @@ type ProtoSpriteCLIArgs = {
   exportFramesDir?: string;
   overlayPolygons?: boolean;
   compress?: boolean;
+  compressionLevel?: number;
 };
 
 class ProtoSpriteCLI {
@@ -284,7 +285,8 @@ class ProtoSpriteCLI {
       ) {
         const originalSize = this.sheet.data.pixelSource.pngData.byteLength;
         this.sheet.data.pixelSource.pngData = await compressPng(
-          this.sheet.data.pixelSource.pngData
+          this.sheet.data.pixelSource.pngData,
+          this.args.compressionLevel
         );
         const compressedSize = this.sheet.data.pixelSource.pngData.byteLength;
         const reduction = (
@@ -447,7 +449,10 @@ class ProtoSpriteCLI {
 
       // Write compressed version at the normal path.
       const pngBuffer = await frameImg.getBuffer("image/png");
-      const compressed = await compressPng(new Uint8Array(pngBuffer));
+      const compressed = await compressPng(
+        new Uint8Array(pngBuffer),
+        this.args.compressionLevel
+      );
       fs.writeFileSync(outPath, compressed, { encoding: "binary" });
 
       if (this.args.debug) {
@@ -860,8 +865,13 @@ program
     "when exporting frames, overlay traced polygons on the output images."
   )
   .option(
-    "--compress",
-    "compress PNG data using pngquant."
+    "--compression <level>",
+    "set PNG compression level (max colors, 2-256). enabled by default.",
+    "256"
+  )
+  .option(
+    "--uncompressed",
+    "disable PNG compression."
   )
   .action(async (opts) => {
     let args: ProtoSpriteCLIArgs = {
@@ -898,7 +908,12 @@ program
     if (typeof opts.exportFrames === "string")
       args.exportFramesDir = opts.exportFrames;
     if (opts.overlayPolygons) args.overlayPolygons = true;
-    if (opts.compress) args.compress = true;
+    if (opts.uncompressed) {
+      args.compress = false;
+    } else {
+      args.compress = true;
+      args.compressionLevel = parseInt(opts.compression, 10);
+    }
 
     const cli = new ProtoSpriteCLI(args);
     await cli._process();

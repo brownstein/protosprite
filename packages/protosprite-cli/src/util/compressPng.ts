@@ -1,12 +1,13 @@
 import PngQuant from "pngquant";
 
 export async function compressPng(
-  pngData: Uint8Array
+  pngData: Uint8Array,
+  colors: number = 256
 ): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const pngQuant = new PngQuant([
-      "256",
+      String(colors),
       "--quality",
       "80-100",
       "--speed",
