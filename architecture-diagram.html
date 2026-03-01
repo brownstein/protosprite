@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protosprite Architecture Diagram</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 32px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    color: #58a6ff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #8b949e;
+    margin-bottom: 40px;
+  }
+
+  /* ── Layout ── */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .stage {
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    background: #161b22;
+    overflow: hidden;
+  }
+  .stage-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border-bottom: 1px solid #30363d;
+    background: #1c2128;
+  }
+  .stage-header .badge {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .stage-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .stage-header .phase {
+    margin-left: auto;
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .stage-body {
+    padding: 20px;
+  }
+
+  /* ── Color themes per package ── */
+  .pkg-cli .badge       { background: #da3633; color: #fff; }
+  .pkg-core .badge      { background: #1f6feb; color: #fff; }
+  .pkg-geom .badge      { background: #8957e5; color: #fff; }
+  .pkg-three .badge     { background: #238636; color: #fff; }
+  .pkg-demo .badge      { background: #d29922; color: #000; }
+  .pkg-ext .badge       { background: #6e7681; color: #fff; }
+  .pkg-proto .badge     { background: #388bfd; color: #fff; }
+
+  .border-cli  { border-color: #da363380; }
+  .border-core { border-color: #1f6feb80; }
+  .border-geom { border-color: #8957e580; }
+  .border-three{ border-color: #23863680; }
+  .border-demo { border-color: #d2992280; }
+
+  /* ── Flow rows ── */
+  .flow-row {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .flow-col {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Boxes ── */
+  .box {
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #0d1117;
+    margin-bottom: 10px;
+  }
+  .box:last-child { margin-bottom: 0; }
+  .box h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .box p, .box li {
+    font-size: 12px;
+    color: #8b949e;
+    line-height: 1.5;
+  }
+  .box ul {
+    margin-left: 16px;
+    margin-top: 4px;
+  }
+  .box code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    background: #1c2128;
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #79c0ff;
+  }
+  .box .file {
+    color: #d2a8ff;
+  }
+
+  /* ── Arrows ── */
+  .arrow-down {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0;
+  }
+  .arrow-down svg {
+    width: 24px;
+    height: 24px;
+    fill: #484f58;
+  }
+  .arrow-right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    flex-shrink: 0;
+  }
+  .arrow-right svg {
+    width: 24px;
+    height: 24px;
+    fill: #484f58;
+  }
+
+  /* ── Proto schema ── */
+  .schema-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .schema-block {
+    border: 1px dashed #30363d;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #0d111788;
+  }
+  .schema-block h4 {
+    font-size: 12px;
+    color: #58a6ff;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .schema-block pre {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #7ee787;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  .schema-block .comment {
+    color: #6e7681;
+  }
+
+  /* ── File format badges ── */
+  .file-fmt {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+  .fmt-ase    { background: #7c4dff22; border: 1px solid #7c4dff; color: #b388ff; }
+  .fmt-json   { background: #ffa72622; border: 1px solid #ffa726; color: #ffcc80; }
+  .fmt-png    { background: #66bb6a22; border: 1px solid #66bb6a; color: #a5d6a7; }
+  .fmt-prs    { background: #42a5f522; border: 1px solid #42a5f5; color: #90caf9; }
+  .fmt-prsg   { background: #ab47bc22; border: 1px solid #ab47bc; color: #ce93d8; }
+  .fmt-ts     { background: #26c6da22; border: 1px solid #26c6da; color: #80deea; }
+  .fmt-proto  { background: #388bfd22; border: 1px solid #388bfd; color: #79c0ff; }
+
+  /* ── Highlight spans ── */
+  .fn  { color: #d2a8ff; font-family: 'SF Mono', monospace; font-size: 11px; }
+  .cls { color: #ffa657; font-family: 'SF Mono', monospace; font-size: 11px; }
+  .key { color: #ff7b72; font-size: 12px; font-weight: 600; }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 20px;
+    background: #1c2128;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  /* ── Connector lines (CSS pseudo) ── */
+  .stage-connector {
+    display: flex;
+    justify-content: center;
+    padding: 2px 0;
+  }
+  .stage-connector .pipe {
+    width: 2px;
+    height: 20px;
+    background: #30363d;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 800px) {
+    .flow-row { flex-direction: column; }
+    .arrow-right { transform: rotate(90deg); min-width: unset; }
+    .schema-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Protosprite Architecture</h1>
+<p class="subtitle">End-to-end data flow: Aseprite &rarr; .prs / .prsg &rarr; Three.js rendering</p>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#da3633"></div> protosprite-cli</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#1f6feb"></div> protosprite-core</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#8957e5"></div> protosprite-geom</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#238636"></div> protosprite-three</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#d29922"></div> protosprite-three-demo</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#6e7681"></div> external tool</div>
+  <div class="legend-item">
+    <span class="file-fmt fmt-prs">.prs</span>
+    <span class="file-fmt fmt-prsg">.prsg</span>
+    file formats
+  </div>
+</div>
+
+<div class="pipeline">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 1: INPUT
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-cli">
+  <div class="stage-header pkg-ext">
+    <span class="badge">External</span>
+    <h2>1. Input: Aseprite Source Files</h2>
+    <span class="phase">Authoring</span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3><span class="file-fmt fmt-ase">.ase / .aseprite</span> Aseprite Project File</h3>
+          <p>The artist's source file containing sprites with:</p>
+          <ul>
+            <li>Multiple <strong>frames</strong> with per-frame duration</li>
+            <li>Nested <strong>layers</strong> (including groups)</li>
+            <li>Named <strong>tags</strong> (animation ranges)</li>
+            <li>Per-cel <strong>z-index</strong> overrides</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 2: ASEPRITE EXPORT
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-cli">
+  <div class="stage-header pkg-cli">
+    <span class="badge">CLI</span>
+    <h2>2. Aseprite Binary Export</h2>
+    <span class="phase">protosprite-cli &middot; <code>build</code> command</span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3>Shell to Aseprite Binary</h3>
+          <p>The CLI finds the Aseprite executable and invokes it with export flags:</p>
+          <ul>
+            <li><code>-b</code> &mdash; batch mode (no GUI)</li>
+            <li><code>--sheet &lt;png&gt;</code> &mdash; output spritesheet image</li>
+            <li><code>--data &lt;json&gt;</code> &mdash; output metadata</li>
+            <li><code>--split-layers --all-layers</code> &mdash; separate layers</li>
+            <li><code>--list-layers --list-tags</code> &mdash; include layer/tag info</li>
+            <li><code>--merge-duplicates --trim</code> &mdash; optimize</li>
+            <li><code>--filename-format "({layer}) {frame}"</code></li>
+          </ul>
+          <p style="margin-top:8px">Source: <span class="file">cli.ts</span> &rarr; <span class="fn">findAsperiteBinary()</span>, <code>child_process.execSync()</code></p>
+        </div>
+      </div>
+      <div class="arrow-right">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="flow-col">
+        <div class="box">
+          <h3>Intermediate Output</h3>
+          <p>Written to a temp directory (<code>/tmp/protosprite/</code>):</p>
+          <div style="margin-top:8px">
+            <span class="file-fmt fmt-json">.json</span>
+            <strong>Aseprite JSON-Hash metadata</strong>
+            <p style="margin-top:2px">Frame coordinates, sizes, durations, layer names, tag definitions. One entry per <code>({layer}) {frame}</code> combo.</p>
+          </div>
+          <div style="margin-top:10px">
+            <span class="file-fmt fmt-png">.png</span>
+            <strong>Packed spritesheet image</strong>
+            <p style="margin-top:2px">All frame/layer cels packed into a single atlas by Aseprite's built-in packer.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 3: IMPORT & DATA MODEL
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-core">
+  <div class="stage-header pkg-core">
+    <span class="badge">Core</span>
+    <h2>3. Aseprite Import &amp; Data Model Construction</h2>
+    <span class="phase">protosprite-core &middot; <code>importers/aseprite.ts</code></span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3><span class="fn">importAsepriteSheetExport()</span></h3>
+          <p>Parses the Aseprite JSON export and constructs the core data model:</p>
+          <ul>
+            <li><strong>Frame name parsing:</strong> Extracts layer name and frame number from <code>({layer}) {frame}</code> format</li>
+            <li><strong>Layer tree assembly:</strong> Builds nested layer hierarchy with group/parent relationships</li>
+            <li><strong>Animation mapping:</strong> Maps Aseprite tags &rarr; <code>Animation { name, indexStart, indexEnd }</code></li>
+            <li><strong>FrameLayer mapping:</strong> For each frame/layer combo, records <code>sheetPosition</code> (where in atlas), <code>spritePosition</code> (offset in canvas), <code>size</code>, and <code>zIndex</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="arrow-right">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="flow-col">
+        <div class="box">
+          <h3>Core Data Structures <span style="font-weight:normal;color:#8b949e">(data.ts)</span></h3>
+          <p>TypeScript classes wrapping protobuf messages:</p>
+          <ul>
+            <li><span class="cls">SpriteSheetData</span> &mdash; top-level container</li>
+            <li><span class="cls">SpriteData</span> &mdash; name, size, frames[], layers[], animations[], pixelSource</li>
+            <li><span class="cls">FrameData</span> &mdash; index, duration, layers[]</li>
+            <li><span class="cls">FrameLayerData</span> &mdash; layerIndex, size, sheetPosition, spritePosition, zIndex</li>
+            <li><span class="cls">LayerData</span> &mdash; name, index, isGroup, parentIndex, opacity</li>
+            <li><span class="cls">AnimationData</span> &mdash; name, indexStart, indexEnd</li>
+          </ul>
+          <p style="margin-top:6px">Each class has <code>.fromProto()</code> / <code>.toProto()</code> for bidirectional protobuf conversion.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 4: PACKING & COMPRESSION
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-core">
+  <div class="stage-header pkg-cli">
+    <span class="badge">CLI</span>
+    <span class="badge" style="background:#1f6feb">Core</span>
+    <h2>4. Sprite Sheet Packing &amp; PNG Compression</h2>
+    <span class="phase">protosprite-core &middot; <code>transform</code></span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3><span class="fn">packSpriteSheet()</span></h3>
+          <p>Optimizes the sprite atlas layout using bin-packing:</p>
+          <ul>
+            <li>Consolidates duplicate frames/regions</li>
+            <li>Re-packs all cels into a minimal atlas</li>
+            <li>Updates all <code>sheetPosition</code> coordinates to match new layout</li>
+            <li>Produces a single combined PNG with embedded pixel data</li>
+          </ul>
+        </div>
+      </div>
+      <div class="arrow-right">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="flow-col">
+        <div class="box">
+          <h3>PNG Compression <span style="font-weight:normal;color:#8b949e">(optional, default on)</span></h3>
+          <p>Lossy compression via <strong>pngquant</strong>:</p>
+          <ul>
+            <li><code>--compression &lt;level&gt;</code> &mdash; max colors (2&ndash;256, default 256)</li>
+            <li><code>--uncompressed</code> &mdash; disables compression</li>
+            <li>Typically ~30&ndash;50% file size reduction</li>
+            <li>Compresses the embedded PNG data in-place before serialization</li>
+          </ul>
+          <p style="margin-top:6px">Source: <span class="file">util/compressPng.ts</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 5: SERIALIZATION
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-core">
+  <div class="stage-header pkg-core">
+    <span class="badge">Core</span>
+    <h2>5. Protobuf Serialization &rarr; <span class="file-fmt fmt-prs">.prs</span></h2>
+    <span class="phase">protosprite-core &middot; <code>@bufbuild/protobuf</code></span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3><span class="cls">ProtoSpriteSheet</span></h3>
+          <ul>
+            <li><code>.toArray()</code> &rarr; <code>Uint8Array</code> &mdash; binary protobuf serialization</li>
+            <li><code>.toJsonObject()</code> &rarr; JSON representation (optional)</li>
+            <li><code>ProtoSpriteSheet.fromArray(bytes)</code> &mdash; deserialize from binary</li>
+          </ul>
+          <p style="margin-top:6px">The data classes convert to/from protobuf messages via <code>.toProto()</code>, then <code>@bufbuild/protobuf</code> handles binary wire encoding.</p>
+        </div>
+      </div>
+      <div class="arrow-right">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="flow-col">
+        <div class="box" style="border-color:#42a5f580">
+          <h3><span class="file-fmt fmt-prs">.prs</span> Binary File Format</h3>
+          <p>Protobuf-encoded <code>SpriteSheet</code> message containing:</p>
+          <ul>
+            <li><strong>sprites[]</strong> &mdash; each with frames, layers, animations, size</li>
+            <li><strong>pixel_source</strong> &mdash; either:
+              <ul>
+                <li><em>Embedded:</em> PNG bytes inline in the protobuf</li>
+                <li><em>External:</em> filename or URL reference</li>
+              </ul>
+            </li>
+            <li>Each <strong>FrameLayer</strong> stores atlas coordinates (<code>sheet_position</code>) and canvas placement (<code>sprite_position</code>)</li>
+          </ul>
+          <p style="margin-top:6px;color:#7ee787">Compact binary &mdash; variable-length integers, no repeated strings, ~30-50% smaller than equivalent JSON</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 6: GEOMETRY TRACING (OPTIONAL)
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-geom">
+  <div class="stage-header pkg-geom">
+    <span class="badge">Geom</span>
+    <span class="badge" style="background:#da3633">CLI</span>
+    <h2>6. Geometry Tracing &rarr; <span class="file-fmt fmt-prsg">.prsg</span></h2>
+    <span class="phase">protosprite-geom &middot; <code>trace/index.ts</code> &middot; optional</span>
+  </div>
+  <div class="stage-body">
+    <p style="font-size:13px;color:#8b949e;margin-bottom:14px">
+      Triggered by <code>--output-prsg &lt;file&gt;</code>. Generates collision polygons and physics shapes from sprite pixel data.
+    </p>
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3>Step A: Contour Extraction</h3>
+          <p><span class="fn">traceContours()</span> &mdash; Marching squares algorithm on the alpha channel. Produces closed polygon contours around opaque regions.</p>
+          <p style="margin-top:6px"><strong>Per-layer mode:</strong> Extracts each layer's cel from the atlas, traces individually, offsets to sprite-local coordinates.</p>
+          <p style="margin-top:4px"><strong>Composite mode:</strong> Uses <span class="fn">renderSpriteInstance()</span> to flatten all layers, then traces the composite image.</p>
+        </div>
+        <div class="arrow-down"><svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+        <div class="box">
+          <h3>Step B: Simplification</h3>
+          <p><span class="fn">simplifyPolygon(contour, tolerance)</span> &mdash; Reduces vertex count while preserving shape. Default tolerance: <code>0.5</code>.</p>
+        </div>
+        <div class="arrow-down"><svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+        <div class="box">
+          <h3>Step C: Convex Decomposition</h3>
+          <p><span class="fn">decomposeConvex()</span> &mdash; Splits non-convex polygons into convex components using <code>poly-decomp</code>. Essential for physics engines.</p>
+        </div>
+      </div>
+      <div class="arrow-right">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="flow-col">
+        <div class="box">
+          <h3>Step D: De-duplication &amp; Pooling</h3>
+          <p>Two-level deduplication dramatically reduces file size:</p>
+          <ul>
+            <li><span class="cls">VertexPoolBuilder</span> &mdash; Deduplicates <code>Vec2</code> vertices across all shapes via hash map (<code>"x,y"</code> key)</li>
+            <li><span class="cls">ShapePoolBuilder</span> &mdash; Deduplicates (polygon + decomposition) pairs. Shapes reference vertices by index.</li>
+          </ul>
+          <p style="margin-top:6px">Result: frames reference shapes by index &rarr; shapes reference vertices by index. Identical cels share a single pool entry.</p>
+        </div>
+        <div class="arrow-down"><svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+        <div class="box" style="border-color:#ab47bc80">
+          <h3><span class="file-fmt fmt-prsg">.prsg</span> Binary File Format</h3>
+          <p>Protobuf-encoded <code>SpriteGeometry</code> message:</p>
+          <ul>
+            <li><strong>entries[]</strong> &mdash; one per sprite, containing:
+              <ul>
+                <li><code>vertex_pool</code> &mdash; de-duplicated Vec2 vertices</li>
+                <li><code>shape_pool</code> &mdash; de-duplicated (polygon, convex decomp) pairs using indexed vertices</li>
+                <li><code>frames[]</code> &mdash; per-frame geometry referencing shape pool by index</li>
+              </ul>
+            </li>
+            <li><strong>sprite_source</strong> &mdash; embedded .prs bytes, or external file/URL reference</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     PROTOBUF SCHEMAS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage" style="border-color:#388bfd80">
+  <div class="stage-header pkg-proto">
+    <span class="badge">Proto</span>
+    <h2>Protobuf Schemas</h2>
+    <span class="phase">Wire format definitions</span>
+  </div>
+  <div class="stage-body">
+    <div class="schema-grid">
+      <div class="schema-block">
+        <h4><span class="file-fmt fmt-proto">sprite.proto</span> &mdash; .prs format</h4>
+<pre>
+<span class="comment">// Top-level</span>
+SpriteSheet {
+  sprites: Sprite[]
+  pixel_source: Embedded | External
+}
+
+Sprite {
+  name, size, pixel_source
+  frames:     Frame[]
+  layers:     Layer[]
+  animations: Animation[]
+}
+
+Frame {
+  index, duration
+  layers: FrameLayer[] {
+    layer_index
+    size { width, height }
+    sheet_position { x, y }  <span class="comment">// atlas coords</span>
+    sprite_position { x, y } <span class="comment">// canvas offset</span>
+    z_index
+  }
+}
+
+Layer { name, is_group, parent_index, opacity }
+Animation { name, index_start, index_end }
+</pre>
+      </div>
+      <div class="schema-block">
+        <h4><span class="file-fmt fmt-proto">sprite_geometry.proto</span> &mdash; .prsg format</h4>
+<pre>
+<span class="comment">// Top-level</span>
+SpriteGeometry {
+  entries: SpriteGeometryEntry[]
+  sprite_source: embedded_prs
+               | external_prs_file
+               | external_prs_url
+}
+
+SpriteGeometryEntry {
+  sprite_name
+  simplify_tolerance
+  vertex_pool:  Vec2[]         <span class="comment">// de-duped</span>
+  shape_pool:   ShapePoolEntry[] <span class="comment">// de-duped</span>
+  frames:       FrameGeometry[]
+}
+
+ShapePoolEntry {
+  polygon: IndexedPolygon
+  convex_decomposition: IndexedPolygon[]
+}
+
+FrameGeometry {
+  frame_index
+  layers: FrameLayerGeometry[] <span class="comment">// per-layer</span>
+  composite: CompositeFrameGeometry
+}
+<span class="comment">// Both reference shape_pool by index</span>
+</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 7: THREE.JS LOADING
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-three">
+  <div class="stage-header pkg-three">
+    <span class="badge">Three</span>
+    <h2>7. Three.js Loading Pipeline</h2>
+    <span class="phase">protosprite-three &middot; runtime</span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3><span class="cls">ProtoSpriteSheetThreeLoader</span></h3>
+          <p>Async resource loader with caching:</p>
+          <ul>
+            <li><code>loadAsync(url | ProtoSpriteSheet)</code></li>
+            <li>Fetches <span class="file-fmt fmt-prs">.prs</span> binary &rarr; <code>ProtoSpriteSheet.fromArray()</code></li>
+            <li>Resolves pixel source:
+              <ul>
+                <li><em>Embedded PNG:</em> creates Blob URL from inline bytes</li>
+                <li><em>External:</em> loads from file path or URL</li>
+              </ul>
+            </li>
+            <li>Loads texture via Three.js <code>TextureLoader</code></li>
+            <li>Applies <code>NearestFilter</code> (pixel-art crisp rendering)</li>
+            <li>URL/object caches prevent duplicate fetches</li>
+          </ul>
+        </div>
+      </div>
+      <div class="arrow-right">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="flow-col">
+        <div class="box">
+          <h3><span class="cls">ProtoSpriteSheetThree</span></h3>
+          <p>Wraps a loaded sheet with Three.js resources:</p>
+          <ul>
+            <li><code>sheetTexture</code> &mdash; Three.js Texture from atlas PNG</li>
+            <li><code>individualTextures</code> &mdash; per-sprite textures (if sprites have their own pixel sources)</li>
+            <li><code>sheetMaterial</code> &mdash; <code>ShaderMaterial</code> with custom vertex/fragment shaders</li>
+            <li><code>getSprite(name | index)</code> &rarr; creates <span class="cls">ProtoSpriteThree</span> instances</li>
+          </ul>
+          <p style="margin-top:6px">Creates <code>ProtoSpriteInstance</code> (core) internally, then wraps it with a Three.js <code>Mesh</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 8: THREE.JS RENDERING
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-three">
+  <div class="stage-header pkg-three">
+    <span class="badge">Three</span>
+    <h2>8. Per-Frame Rendering</h2>
+    <span class="phase">protosprite-three &middot; <span class="cls">ProtoSpriteThree</span></span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col" style="flex:1.2">
+        <div class="box">
+          <h3>Geometry Construction</h3>
+          <p>Each sprite is a single <code>Mesh</code> with a <code>BufferGeometry</code> containing one quad per visible layer:</p>
+          <ul>
+            <li><code>position</code> &mdash; Float32 [x, y, z] &times; 4 vertices per layer-quad</li>
+            <li><code>uv</code> &mdash; Float32 texture coordinates mapping into the sprite atlas</li>
+            <li><code>vtxIndex</code> &mdash; corner index (0-3) for shader effects</li>
+            <li><code>vtxOpacity</code> &mdash; per-vertex opacity</li>
+            <li><code>vtxMultColor</code> &mdash; RGBA multiply tint</li>
+            <li><code>vtxFadeColor</code> &mdash; RGBA fade/blend</li>
+            <li><code>vtxOutline</code> &mdash; RGBA outline color</li>
+            <li><code>vtxOutlineThickness</code> &mdash; outline width</li>
+          </ul>
+          <p style="margin-top:8px">Index buffer pre-filled: two triangles per quad (0,1,3 + 1,2,3). <code>drawRange</code> limits to visible layers.</p>
+        </div>
+      </div>
+      <div class="flow-col" style="flex:1">
+        <div class="box">
+          <h3><span class="fn">updateGeometry()</span> &mdash; per frame</h3>
+          <p>Called when animation frame changes:</p>
+          <ol style="margin-left:16px;margin-top:4px;font-size:12px;color:#8b949e;line-height:1.7">
+            <li>Get current frame from animation state</li>
+            <li>Calculate Z-order: <code>layer.index &times; 0.05 + zIndex &times; 0.05</code></li>
+            <li>For each <code>FrameLayer</code> in frame:
+              <ul>
+                <li>Skip if layer hidden or parent group hidden</li>
+                <li>Compute quad position: <code>offset + spritePosition</code></li>
+                <li>Compute UV: <code>sheetPosition / textureSize</code></li>
+                <li>Fill position &amp; UV buffer arrays</li>
+              </ul>
+            </li>
+            <li>Update draw range to visible layer count</li>
+          </ol>
+          <p style="margin-top:8px"><strong>Dirty flags:</strong> <code>positionDirty</code> / <code>extraDirty</code> &mdash; only updates GPU buffers when state changes.</p>
+        </div>
+        <div class="box">
+          <h3>Animation State Machine</h3>
+          <p><span class="cls">ProtoSpriteInstanceAnimationState</span> (core):</p>
+          <ul>
+            <li><code>advance(ms)</code> &mdash; decrements frame timer by <code>delta &times; speed</code>, advances frames when timer expires</li>
+            <li>Supports forward/reverse playback, looping</li>
+            <li>Emits <code>FrameSwapped</code>, <code>LoopComplete</code> events</li>
+            <li>ProtoSpriteThree re-emits as <code>animationFrameSwapped</code>, <code>animationTagStarted</code>, <code>animationLooped</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="box">
+        <h3>Custom Shader Pipeline</h3>
+        <div class="flow-row" style="gap:16px">
+          <div class="flow-col">
+            <h3 style="font-size:12px;color:#7ee787">Vertex Shader</h3>
+            <p>Transforms quad positions, passes UV coords and per-vertex effect attributes (opacity, mult color, fade color, outline) to fragment shader as varyings.</p>
+          </div>
+          <div class="arrow-right">
+            <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="flow-col">
+            <h3 style="font-size:12px;color:#7ee787">Fragment Shader</h3>
+            <p>Samples the sprite atlas texture, then applies effects in order: outline detection (neighbor alpha sampling), color multiply blend, color fade blend, opacity. Outputs final RGBA with transparency.</p>
+          </div>
+          <div class="arrow-right">
+            <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="flow-col">
+            <h3 style="font-size:12px;color:#7ee787">Uniforms</h3>
+            <p><code>map</code> &mdash; atlas Texture<br><code>invSheetSize</code> &mdash; <code>1/textureSize</code> for UV calculations</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="box">
+        <h3>Layer Manipulation API</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
+          <div>
+            <p><code>hideLayers() / showLayers()</code></p>
+            <p style="font-size:11px;color:#6e7681">Toggle layer visibility (expands groups)</p>
+          </div>
+          <div>
+            <p><code>setLayerOpacity()</code></p>
+            <p style="font-size:11px;color:#6e7681">Per-layer alpha override</p>
+          </div>
+          <div>
+            <p><code>multiplyLayers(color, opacity)</code></p>
+            <p style="font-size:11px;color:#6e7681">Color tint via multiply blend</p>
+          </div>
+          <div>
+            <p><code>fadeLayers(color, opacity)</code></p>
+            <p style="font-size:11px;color:#6e7681">Color overlay via fade blend</p>
+          </div>
+          <div>
+            <p><code>outlineLayers(thickness, color)</code></p>
+            <p style="font-size:11px;color:#6e7681">Edge outline via neighbor sampling</p>
+          </div>
+          <div>
+            <p><code>center() / clone()</code></p>
+            <p style="font-size:11px;color:#6e7681">Auto-center offset, duplicate instance</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-connector"><div class="pipe"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     STAGE 9: DEMO APP
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="stage border-demo">
+  <div class="stage-header pkg-demo">
+    <span class="badge">Demo</span>
+    <h2>9. protosprite-three-demo</h2>
+    <span class="phase">React + Three.js application</span>
+  </div>
+  <div class="stage-body">
+    <div class="flow-row">
+      <div class="flow-col">
+        <div class="box">
+          <h3>App.tsx &mdash; Initialization</h3>
+          <ol style="margin-left:16px;margin-top:4px;font-size:12px;color:#8b949e;line-height:1.7">
+            <li>Creates <code>Scene</code> and <span class="cls">ProtoSpriteSheetThreeLoader</span></li>
+            <li>Loads <span class="file-fmt fmt-prs">bird.prs</span> via <code>loader.loadAsync()</code> &rarr; <span class="cls">ProtoSpriteSheetThree</span></li>
+            <li>Fetches <span class="file-fmt fmt-prsg">bird.prsg</span> &rarr; <code>ProtoSpriteGeometry.fromArray()</code> for geometry overlay data</li>
+            <li>Calls <code>sheet.getSprite()</code> to create <span class="cls">ProtoSpriteThree</span> instances</li>
+            <li>Bin-packs multiple sprites into the viewport</li>
+            <li>Adds sprite meshes to the Three.js scene</li>
+          </ol>
+        </div>
+      </div>
+      <div class="flow-col">
+        <div class="box">
+          <h3>Renderer.tsx &mdash; Render Loop</h3>
+          <ul>
+            <li>Sets up <code>WebGLRenderer</code> with <code>OrthographicCamera</code></li>
+            <li><code>requestAnimationFrame</code> loop calculates delta time</li>
+            <li>Each tick: <code>sprite.advance(delta)</code> updates animation</li>
+            <li>Syncs <span class="cls">GeometryOverlay</span> positions if active</li>
+            <li><code>renderer.render(scene, camera)</code> draws to canvas</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h3>Interactive Tabs</h3>
+          <ul>
+            <li><strong>Sprite Playground:</strong> animation select, playback speed, opacity, outline, multiply/fade colors, layer visibility, geometry overlay, sprite count</li>
+            <li><strong>Import:</strong> drag-drop Aseprite JSON+PNG export &rarr; in-browser conversion to <span class="file-fmt fmt-prs">.prs</span> via <span class="fn">importAsepriteSheetExport()</span> + <span class="fn">packSpriteSheet()</span></li>
+            <li><strong>Debug:</strong> frame stepping, per-frame inspection</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Geometry overlay detail -->
+    <div style="margin-top:12px">
+      <div class="box">
+        <h3>GeometryOverlay.ts &mdash; <span class="file-fmt fmt-prsg">.prsg</span> visualization</h3>
+        <p>Renders traced polygons as colored wireframe lines overlaid on the sprite:</p>
+        <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
+          <span style="color:#00ff00">&#9632; Green</span><span style="font-size:12px;color:#8b949e">&mdash; per-layer polygons</span>
+          <span style="color:#ff0000">&#9632; Red</span><span style="font-size:12px;color:#8b949e">&mdash; per-layer convex decomposition</span>
+          <span style="color:#00ffff">&#9632; Cyan</span><span style="font-size:12px;color:#8b949e">&mdash; composite polygons</span>
+          <span style="color:#ffff00">&#9632; Yellow</span><span style="font-size:12px;color:#8b949e">&mdash; composite convex decomposition</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     PACKAGE DEPENDENCY GRAPH
+     ═══════════════════════════════════════════════════════════════ -->
+<div style="margin-top:32px">
+  <div class="stage">
+    <div class="stage-header">
+      <h2>Package Dependency Graph</h2>
+    </div>
+    <div class="stage-body" style="display:flex;justify-content:center">
+      <svg viewBox="0 0 700 320" style="max-width:700px;width:100%;font-family:'Segoe UI',system-ui,sans-serif">
+        <!-- Boxes -->
+        <rect x="260" y="10" width="180" height="44" rx="8" fill="#161b22" stroke="#da3633" stroke-width="2"/>
+        <text x="350" y="37" text-anchor="middle" fill="#c9d1d9" font-size="14" font-weight="600">protosprite-cli</text>
+
+        <rect x="60"  y="120" width="180" height="44" rx="8" fill="#161b22" stroke="#1f6feb" stroke-width="2"/>
+        <text x="150" y="147" text-anchor="middle" fill="#c9d1d9" font-size="14" font-weight="600">protosprite-core</text>
+
+        <rect x="460" y="120" width="180" height="44" rx="8" fill="#161b22" stroke="#8957e5" stroke-width="2"/>
+        <text x="550" y="147" text-anchor="middle" fill="#c9d1d9" font-size="14" font-weight="600">protosprite-geom</text>
+
+        <rect x="60" y="230" width="180" height="44" rx="8" fill="#161b22" stroke="#238636" stroke-width="2"/>
+        <text x="150" y="257" text-anchor="middle" fill="#c9d1d9" font-size="14" font-weight="600">protosprite-three</text>
+
+        <rect x="460" y="230" width="200" height="44" rx="8" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+        <text x="560" y="257" text-anchor="middle" fill="#c9d1d9" font-size="14" font-weight="600">protosprite-three-demo</text>
+
+        <!-- CLI -> Core -->
+        <line x1="300" y1="54" x2="190" y2="120" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <!-- CLI -> Geom -->
+        <line x1="400" y1="54" x2="510" y2="120" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <!-- Geom -> Core -->
+        <line x1="460" y1="142" x2="240" y2="142" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <!-- Three -> Core -->
+        <line x1="150" y1="230" x2="150" y2="164" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <!-- Demo -> Three -->
+        <line x1="460" y1="252" x2="240" y2="252" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <!-- Demo -> Core -->
+        <line x1="500" y1="230" x2="200" y2="164" stroke="#484f58" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrowhead)"/>
+        <!-- Demo -> Geom -->
+        <line x1="560" y1="230" x2="560" y2="164" stroke="#484f58" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrowhead)"/>
+
+        <!-- Labels on edges -->
+        <text x="220" y="82" text-anchor="middle" fill="#6e7681" font-size="10">imports</text>
+        <text x="480" y="82" text-anchor="middle" fill="#6e7681" font-size="10">imports</text>
+        <text x="350" y="134" text-anchor="middle" fill="#6e7681" font-size="10">depends on</text>
+        <text x="134" y="200" text-anchor="middle" fill="#6e7681" font-size="10">depends on</text>
+        <text x="350" y="244" text-anchor="middle" fill="#6e7681" font-size="10">depends on</text>
+        <text x="340" y="200" text-anchor="middle" fill="#6e7681" font-size="10" font-style="italic">direct import</text>
+        <text x="580" y="200" text-anchor="end" fill="#6e7681" font-size="10" font-style="italic">direct import</text>
+
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#484f58"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ADDITIONAL OUTPUTS
+     ═══════════════════════════════════════════════════════════════ -->
+<div style="margin-top:24px">
+  <div class="stage border-cli">
+    <div class="stage-header pkg-cli">
+      <span class="badge">CLI</span>
+      <h2>Additional CLI Outputs</h2>
+      <span class="phase"><code>build</code> command options</span>
+    </div>
+    <div class="stage-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px">
+        <div class="box">
+          <h3><span class="file-fmt fmt-ts">.ts</span> Type Definitions</h3>
+          <p><code>--write-types</code><br>Generates TypeScript types for animation names and layer names, enabling type-safe API usage.</p>
+        </div>
+        <div class="box">
+          <h3><span class="file-fmt fmt-png">.png</span> Preview Image</h3>
+          <p><code>--preview</code><br>Renders frame 0 of each sprite side-by-side as a preview via <span class="fn">renderSpriteInstance()</span>.</p>
+        </div>
+        <div class="box">
+          <h3><span class="file-fmt fmt-png">.png</span> Frame Exports</h3>
+          <p><code>--export-frames</code><br>Individual PNG per animation frame. Optionally overlays geometry polygons with <code>--overlay-polygons</code>.</p>
+        </div>
+        <div class="box">
+          <h3><span class="file-fmt fmt-json">.json</span> Geometry JSON</h3>
+          <p><code>--output-geom-json</code><br>Human-readable JSON dump of traced geometry data.</p>
+        </div>
+        <div class="box">
+          <h3><span class="file-fmt fmt-png">.png</span> External Sheet</h3>
+          <p><code>--external-sheet</code><br>Writes atlas PNG separately instead of embedding in .prs. The .prs references it by filename.</p>
+        </div>
+        <div class="box">
+          <h3>Analyze Command</h3>
+          <p><code>analyze -i &lt;files&gt;</code><br>Inspects .prs/.prsg files: sprite info, frame counts, animation list, layer tree, geometry statistics.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /pipeline -->
+
+<div style="text-align:center;margin-top:40px;padding-bottom:32px;color:#484f58;font-size:12px">
+  Generated from protosprite source &mdash; packages: protosprite-core, protosprite-geom, protosprite-cli, protosprite-three, protosprite-three-demo
+</div>
+
+</body>
+</html>

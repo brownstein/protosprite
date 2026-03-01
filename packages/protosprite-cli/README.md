@@ -26,6 +26,7 @@ Options:
   --preview [preview-output]     Output a preview image.
   --json                         Output in JSON format.
   --debug                        Enable debug logging.
+  --trace-geometry               Enable polygon tracing on the input sprites.
   --simplify-tolerance <number>  Simplification tolerance for polygon tracing (default: 0.5).
   --per-layer-geometry           Include per-layer polygons in addition to composite-frame polygons.
   --no-composite-geometry        Disable composite-frame polygons (only useful with --per-layer-geometry).
@@ -34,6 +35,8 @@ Options:
   --prsg-embed-prs               Embed the .prs data inside the .prsg file.
   --export-frames [dir]          Export each frame of each animation as a separate PNG.
   --overlay-polygons             When exporting frames, overlay traced polygons on the output images.
+  --compression <level>          PNG compression max colors (2-256, default: 256). Compression is enabled by default.
+  --uncompressed                 Disable PNG compression.
 ```
 
 #### Examples
