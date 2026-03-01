@@ -8,10 +8,6 @@ A protobuf-based binary format for sprite sheets, with geometry tracing and Thre
 
 Protosprite is a monorepo containing a suite of packages for working with sprite sheets. It takes Aseprite source files and produces compact binary `.prs` (sprite data) and `.prsg` (collision geometry) files, which can be loaded and rendered in Three.js with animation, layer control, and visual effects.
 
-## Architecture
-
-![Protosprite architecture title and package legend](diagrams/01-title-legend.png)
-
 ### Stage 1: Aseprite Input
 
 Source `.ase`/`.aseprite` files containing frames, layers, tags, and z-index overrides.
