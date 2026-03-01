@@ -540,6 +540,7 @@ function App() {
                     const spriteSheet = new ProtoSpriteSheet(sheet);
                     const spriteSheetThree =
                       await loader.loadAsync(spriteSheet);
+                    setGeometryData(null);
                     setSheet(spriteSheetThree);
                   }}
                 />
