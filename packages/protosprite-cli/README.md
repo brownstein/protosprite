@@ -59,6 +59,58 @@ Export frames with polygon overlays:
 protosprite-cli build -i sprite.prsg --export-frames ./frames --overlay-polygons
 ```
 
+### `edit`
+
+Make targeted edits to an existing `.prs` file. Can remove animations, remove layers, and adjust frame durations. When layers or animations are removed, the sprite sheet is automatically re-packed.
+
+```
+Usage: protosprite-cli edit [options]
+
+Options:
+  -i, --input <input>                  Input .prs file.
+  -o, --output <output>                Output .prs file.
+  --remove-animation <names...>        Remove animations by name.
+  --remove-layer <names...>            Remove layers by name (children of removed groups are also removed).
+  --set-duration <ms>                  Set duration for all frames (ms).
+  --set-animation-duration <spec...>   Set duration for all frames in an animation: name:ms.
+  --set-frame-duration <spec...>       Set duration for a specific frame in an animation: name:frameIndex:ms.
+  --json                               Output in JSON format.
+  --compress                           Compress the output PNG.
+  --compression <level>                Compression level (max colors, 2-256, default: 256).
+```
+
+#### Examples
+
+Remove an animation:
+
+```bash
+protosprite-cli edit -i sprite.prs -o sprite-edited.prs --remove-animation idle
+```
+
+Remove a layer:
+
+```bash
+protosprite-cli edit -i sprite.prs -o sprite-edited.prs --remove-layer sword
+```
+
+Set all frame durations to 50ms:
+
+```bash
+protosprite-cli edit -i sprite.prs -o sprite-edited.prs --set-duration 50
+```
+
+Set duration for all frames in a specific animation:
+
+```bash
+protosprite-cli edit -i sprite.prs -o sprite-edited.prs --set-animation-duration idle:200
+```
+
+Set duration for individual frames within an animation (frame index is relative to the animation):
+
+```bash
+protosprite-cli edit -i sprite.prs -o sprite-edited.prs --set-frame-duration idle:0:200 --set-frame-duration idle:2:300
+```
+
 ### `analyze`
 
 Analyze `.prs` and `.prsg` files and print structural information.

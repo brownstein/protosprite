@@ -580,26 +580,49 @@ function describePixelSource(
   return { description: "unknown", type: "unknown" };
 }
 
-function analyzePrs(filePath: string, fileSize: number, sheet: ProtoSpriteSheet) {
+function analyzePrs(
+  filePath: string,
+  fileSize: number,
+  sheet: ProtoSpriteSheet,
+  opts?: { frameDurations?: boolean; animation?: string }
+) {
   const pixelSourceInfo = describePixelSource(sheet.data.pixelSource as any);
 
   const sprites = sheet.data.sprites.map((sprite) => {
     const totalDuration = sprite.frames.reduce((sum, f) => sum + f.duration, 0);
 
-    const animations = sprite.animations.map((anim) => {
-      let animDuration = 0;
-      for (let i = anim.indexStart; i <= anim.indexEnd; i++) {
-        const frame = sprite.frames.find((f) => f.index === i);
-        animDuration += frame?.duration ?? 0;
-      }
-      return {
-        name: anim.name,
-        indexStart: anim.indexStart,
-        indexEnd: anim.indexEnd,
-        frameCount: anim.indexEnd - anim.indexStart + 1,
-        duration: animDuration
-      };
-    });
+    const animations = sprite.animations
+      .filter((anim) => !opts?.animation || anim.name === opts.animation)
+      .map((anim) => {
+        let animDuration = 0;
+        const frames: { index: number; duration: number }[] = [];
+        for (let i = anim.indexStart; i <= anim.indexEnd; i++) {
+          const frame = sprite.frames.find((f) => f.index === i);
+          const duration = frame?.duration ?? 0;
+          animDuration += duration;
+          if (opts?.frameDurations) {
+            frames.push({ index: i, duration });
+          }
+        }
+        const result: {
+          name: string;
+          indexStart: number;
+          indexEnd: number;
+          frameCount: number;
+          duration: number;
+          frameDurations?: { index: number; duration: number }[];
+        } = {
+          name: anim.name,
+          indexStart: anim.indexStart,
+          indexEnd: anim.indexEnd,
+          frameCount: anim.indexEnd - anim.indexStart + 1,
+          duration: animDuration
+        };
+        if (opts?.frameDurations) {
+          result.frameDurations = frames;
+        }
+        return result;
+      });
 
     const layers = sprite.layers.map((layer) => ({
       name: layer.name,
@@ -609,7 +632,15 @@ function analyzePrs(filePath: string, fileSize: number, sheet: ProtoSpriteSheet)
       opacity: layer.opacity
     }));
 
-    return {
+    const spriteResult: {
+      name: string;
+      size: { width: number; height: number };
+      frameCount: number;
+      totalDuration: number;
+      animations: typeof animations;
+      layers: typeof layers;
+      frameDurations?: { index: number; duration: number }[];
+    } = {
       name: sprite.name,
       size: { width: sprite.size.width, height: sprite.size.height },
       frameCount: sprite.frames.length,
@@ -617,6 +648,15 @@ function analyzePrs(filePath: string, fileSize: number, sheet: ProtoSpriteSheet)
       animations,
       layers
     };
+
+    if (opts?.frameDurations && !opts?.animation) {
+      spriteResult.frameDurations = sprite.frames.map((f) => ({
+        index: f.index,
+        duration: f.duration
+      }));
+    }
+
+    return spriteResult;
   });
 
   return {
@@ -662,7 +702,7 @@ function printLayerTree(
   // But some layers may have parentIndex = 0. Let's check if we already printed them.
 }
 
-function printPrsAnalysis(result: ReturnType<typeof analyzePrs>) {
+function printPrsAnalysis(result: ReturnType<typeof analyzePrs>, opts?: { frameDurations?: boolean }) {
   console.log(`File: ${result.file} (${formatBytes(result.fileSize)} bytes)`);
   console.log(`  Pixel source: ${result.pixelSource.description}`);
 
@@ -671,10 +711,17 @@ function printPrsAnalysis(result: ReturnType<typeof analyzePrs>) {
     console.log(`  Sprite: "${sprite.name}" (${sprite.size.width}x${sprite.size.height})`);
     console.log(`    Frames: ${sprite.frameCount} (total duration: ${sprite.totalDuration}ms)`);
 
+    if (opts?.frameDurations && sprite.frameDurations) {
+      console.log(`    Frame durations: ${sprite.frameDurations.map((f) => f.duration).join(", ")}`);
+    }
+
     if (sprite.animations.length > 0) {
       console.log(`    Animations:`);
       for (const anim of sprite.animations) {
         console.log(`      - ${anim.name} (frames ${anim.indexStart}-${anim.indexEnd}, ${anim.duration}ms)`);
+        if (opts?.frameDurations && anim.frameDurations) {
+          console.log(`        Frame durations: ${anim.frameDurations.map((f) => f.duration).join(", ")}`);
+        }
       }
     }
 
@@ -920,13 +967,223 @@ program
   });
 
 program
+  .command("edit")
+  .description("Make targeted edits to a .prs file")
+  .requiredOption("-i, --input <input>", "Input .prs file")
+  .requiredOption("-o, --output <output>", "Output .prs file")
+  .option("--remove-animation <names...>", "Remove animations by name")
+  .option("--remove-layer <names...>", "Remove layers by name")
+  .option("--set-duration <ms>", "Set duration for all frames (ms)")
+  .option(
+    "--set-animation-duration <spec...>",
+    "Set duration for all frames in an animation: name:ms (repeatable)"
+  )
+  .option(
+    "--set-frame-duration <spec...>",
+    "Set duration for a specific frame in an animation: name:frameIndex:ms (repeatable)"
+  )
+  .option("--json", "Output in JSON format")
+  .option("--compress", "Compress the output PNG")
+  .option(
+    "--compression <level>",
+    "Compression level (max colors, 2-256)",
+    "256"
+  )
+  .action(async (opts) => {
+    const rawBuff = fs.readFileSync(opts.input);
+    const sheet = ProtoSpriteSheet.fromArray(new Uint8Array(rawBuff));
+
+    let needsRepack = false;
+
+    for (const sprite of sheet.data.sprites) {
+      // Remove animations by name.
+      if (opts.removeAnimation) {
+        const removeSet = new Set(opts.removeAnimation);
+        const before = sprite.animations.length;
+        sprite.animations = sprite.animations.filter(
+          (a) => !removeSet.has(a.name)
+        );
+        if (sprite.animations.length !== before) needsRepack = true;
+      }
+
+      // Remove layers by name (including children of removed groups).
+      if (opts.removeLayer) {
+        const removeNames = new Set(opts.removeLayer);
+        const indicesToRemove = new Set<number>();
+
+        for (const layer of sprite.layers) {
+          if (removeNames.has(layer.name)) {
+            indicesToRemove.add(layer.index);
+          }
+        }
+
+        // Cascade to children of removed groups.
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const layer of sprite.layers) {
+            if (
+              layer.parentIndex !== undefined &&
+              indicesToRemove.has(layer.parentIndex) &&
+              !indicesToRemove.has(layer.index)
+            ) {
+              indicesToRemove.add(layer.index);
+              changed = true;
+            }
+          }
+        }
+
+        if (indicesToRemove.size > 0) {
+          // Remove layers and build old-to-new index mapping.
+          sprite.layers = sprite.layers.filter(
+            (l) => !indicesToRemove.has(l.index)
+          );
+          const indexMap = new Map<number, number>();
+          sprite.layers.forEach((layer, newIdx) => {
+            indexMap.set(layer.index, newIdx);
+            layer.index = newIdx;
+          });
+
+          // Update parentIndex references.
+          for (const layer of sprite.layers) {
+            if (layer.parentIndex !== undefined) {
+              layer.parentIndex = indexMap.get(layer.parentIndex);
+            }
+          }
+
+          // Filter frame layers and update layerIndex references.
+          for (const frame of sprite.frames) {
+            frame.layers = frame.layers.filter((fl) =>
+              indexMap.has(fl.layerIndex)
+            );
+            for (const fl of frame.layers) {
+              fl.layerIndex = indexMap.get(fl.layerIndex)!;
+            }
+          }
+
+          needsRepack = true;
+        }
+      }
+
+      // Set duration for all frames.
+      if (opts.setDuration) {
+        const ms = parseInt(opts.setDuration, 10);
+        for (const frame of sprite.frames) {
+          frame.duration = ms;
+        }
+      }
+
+      // Set duration for all frames in specific animations.
+      if (opts.setAnimationDuration) {
+        for (const spec of opts.setAnimationDuration) {
+          const parts = spec.split(":");
+          if (parts.length !== 2) {
+            console.error(
+              `Invalid --set-animation-duration spec: ${spec} (expected name:ms)`
+            );
+            process.exit(1);
+          }
+          const [name, msStr] = parts;
+          const ms = parseInt(msStr, 10);
+          const anim = sprite.animations.find((a) => a.name === name);
+          if (!anim) {
+            console.error(`Animation not found: ${name}`);
+            process.exit(1);
+          }
+          for (let i = anim.indexStart; i <= anim.indexEnd; i++) {
+            const frame = sprite.frames.find((f) => f.index === i);
+            if (frame) frame.duration = ms;
+          }
+        }
+      }
+
+      // Set duration for specific frames within animations.
+      if (opts.setFrameDuration) {
+        for (const spec of opts.setFrameDuration) {
+          const parts = spec.split(":");
+          if (parts.length !== 3) {
+            console.error(
+              `Invalid --set-frame-duration spec: ${spec} (expected name:frameIndex:ms)`
+            );
+            process.exit(1);
+          }
+          const [name, frameIdxStr, msStr] = parts;
+          const frameIdx = parseInt(frameIdxStr, 10);
+          const ms = parseInt(msStr, 10);
+          const anim = sprite.animations.find((a) => a.name === name);
+          if (!anim) {
+            console.error(`Animation not found: ${name}`);
+            process.exit(1);
+          }
+          const absoluteIdx = anim.indexStart + frameIdx;
+          if (absoluteIdx > anim.indexEnd) {
+            console.error(
+              `Frame index ${frameIdx} out of range for animation "${name}" (max: ${anim.indexEnd - anim.indexStart})`
+            );
+            process.exit(1);
+          }
+          const frame = sprite.frames.find((f) => f.index === absoluteIdx);
+          if (frame) frame.duration = ms;
+        }
+      }
+    }
+
+    // Re-pack sprite sheet if structural changes were made.
+    if (needsRepack) {
+      sheet.data = await packSpriteSheet(sheet.data);
+      sheet.sprites = sheet.data.sprites.map(
+        (d) => new ProtoSprite(d, sheet)
+      );
+    }
+
+    // Compress embedded PNG if requested.
+    if (
+      opts.compress &&
+      isEmbeddedSpriteSheetData(sheet.data.pixelSource) &&
+      sheet.data.pixelSource.pngData
+    ) {
+      const compressionLevel = parseInt(opts.compression, 10);
+      const originalSize = sheet.data.pixelSource.pngData.byteLength;
+      sheet.data.pixelSource.pngData = await compressPng(
+        sheet.data.pixelSource.pngData,
+        compressionLevel
+      );
+      const compressedSize = sheet.data.pixelSource.pngData.byteLength;
+      const reduction = (
+        ((originalSize - compressedSize) / originalSize) *
+        100
+      ).toFixed(1);
+      console.log(
+        `PNG compression: ${formatBytes(originalSize)} -> ${formatBytes(compressedSize)} bytes (${reduction}% reduction)`
+      );
+    }
+
+    // Write output.
+    if (opts.json) {
+      const jsonStr = JSON.stringify(sheet.toJsonObject());
+      fs.writeFileSync(opts.output, jsonStr, { encoding: "utf8" });
+    } else {
+      const binBuff = sheet.toArray();
+      fs.writeFileSync(opts.output, binBuff, { encoding: "binary" });
+    }
+
+    console.log(`Wrote ${opts.output}`);
+  });
+
+program
   .command("analyze")
   .description("Analyze .prs and .prsg files and print structural information")
   .requiredOption("-i, --input [input...]", "Input files to analyze.")
   .option("--json", "Output in JSON format")
+  .option("--frame-durations", "List per-frame durations for each animation")
+  .option("--animation <name>", "Show durations for only the named animation")
   .action(async (opts) => {
     const inputFiles = Array.isArray(opts.input) ? opts.input : [];
     const jsonMode = !!opts.json;
+    const analyzeOpts = {
+      frameDurations: !!opts.frameDurations,
+      animation: opts.animation as string | undefined
+    };
     const results: (ReturnType<typeof analyzePrs> | ReturnType<typeof analyzePrsg>)[] = [];
 
     for (const inputFile of inputFiles) {
@@ -945,11 +1202,11 @@ program
         }
       } else {
         const sheet = ProtoSpriteSheet.fromArray(new Uint8Array(rawBuff));
-        const result = analyzePrs(inputFile, fileSize, sheet);
+        const result = analyzePrs(inputFile, fileSize, sheet, analyzeOpts);
         results.push(result);
         if (!jsonMode) {
           if (results.length > 1) console.log();
-          printPrsAnalysis(result);
+          printPrsAnalysis(result, analyzeOpts);
         }
       }
     }
