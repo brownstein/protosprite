@@ -1,7 +1,7 @@
 {
   "name": "protosprite-cli",
   "type": "module",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Command line utilities for working with protosprite",
   "bin": "./dist/cli.js",
   "files": [
@@ -30,8 +30,8 @@
     "jimp": "^1.6.0",
     "js-base64": "^3.7.8",
     "pngquant": "^4.2.0",
-    "protosprite-core": "^0.2.3",
-    "protosprite-geom": "^0.2.3",
+    "protosprite-core": "^0.2.4",
+    "protosprite-geom": "^0.2.4",
     "temp-dir": "^3.0.0",
     "typescript": "^5.9.2"
   },
