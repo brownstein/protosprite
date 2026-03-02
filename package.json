@@ -19,8 +19,21 @@
   },
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
-    "lerna": "^8.2.3",
+    "lerna": "^9.0.5",
     "prettier": "3.6.2",
     "pretty-quick": "^4.0.0"
+  },
+  "overrides": {
+    "cross-spawn": "^7.0.6",
+    "http-cache-semantics": "^4.1.1",
+    "lerna": {
+      "tar": "^7.5.8"
+    },
+    "nx": {
+      "minimatch": "^10.2.3"
+    },
+    "@nx/devkit": {
+      "minimatch": "^10.2.3"
+    }
   }
 }
