@@ -1,7 +1,7 @@
 {
   "name": "protosprite-geom",
   "type": "module",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Polygon geometry tracing and encoding for protosprite",
   "main": "dist/core.js",
   "types": "dist/src/core/index.d.ts",
@@ -48,7 +48,7 @@
     "d3-contour": "^4.0.2",
     "jimp": "^1.6.0",
     "poly-decomp": "^0.3.0",
-    "protosprite-core": "^0.2.4",
+    "protosprite-core": "^0.3.0",
     "simplify-js": "^1.2.4",
     "tslib": "^2.8.1",
     "typescript": "^5.9.2"
