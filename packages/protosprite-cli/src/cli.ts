@@ -33,7 +33,6 @@ import { compressPng } from "./util/compressPng.js";
 import { findSteamAsepriteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
 
-
 function drawLine(
   image: RenderedImage,
   x0: number,
