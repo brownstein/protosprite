@@ -4,6 +4,7 @@ import * as aseprite from "@kayahr/aseprite";
 import childProcess from "child_process";
 import fs from "fs";
 import { Jimp } from "jimp";
+import os from "os";
 import path from "path";
 import ProtoSprite, {
   ProtoSpriteInstance,
@@ -22,8 +23,6 @@ import {
 } from "../../protosprite-core/dist/src/core/data.js";
 import { findSteamAsepriteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
-import os from "os";
-
 
 const program = new Command()
   .name("protosprite-cli")
@@ -117,12 +116,14 @@ class ProtoSpriteCLI {
         // Replace spaces in binary path with escapes.
         if (os.platform() === "darwin") {
           asepriteBinPath = asepriteBinPath?.replaceAll(" ", "\\ ") ?? null;
-	}
+        }
         if (asepriteBinPath == null) asepriteBinPath = "aseprite";
-          try{
-            childProcess.execSync(`${asepriteBinPath} --version`);
-        }catch{
-          throw new Error("Cannot find Steam aseprite binary or 'aseprite' on your PATH");
+        try {
+          childProcess.execSync(`${asepriteBinPath} --version`);
+        } catch {
+          throw new Error(
+            "Cannot find Steam aseprite binary or 'aseprite' on your PATH"
+          );
         }
         const asepriteArgs = [
           "-b",
