@@ -1089,7 +1089,7 @@ export class ProtoSpriteThree<
   }
 
   get centerOffset(): Vector2 {
-    return this.offset.clone();
+    return this.offset;
   }
 
   get size() {
