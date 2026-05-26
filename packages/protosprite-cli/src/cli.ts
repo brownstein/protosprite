@@ -30,9 +30,8 @@ import {
 
 type RenderedImage = Awaited<ReturnType<typeof renderSpriteInstance>>;
 import { compressPng } from "./util/compressPng.js";
-import { findAsperiteBinary } from "./util/findAseprite.js";
+import { findSteamAsepriteBinary } from "./util/findAseprite.js";
 import { genTypeDefinitions } from "./util/genDefinitions.js";
-
 
 function drawLine(
   image: RenderedImage,
@@ -213,8 +212,19 @@ class ProtoSpriteCLI {
           this.workingDirectory,
           `${inputFileParts.name}.png`
         );
-        let asepriteBinPath = findAsperiteBinary();
-
+        let asepriteBinPath = findSteamAsepriteBinary();
+        // Replace spaces in binary path with escapes.
+        if (os.platform() === "darwin") {
+          asepriteBinPath = asepriteBinPath?.replaceAll(" ", "\\ ") ?? null;
+        }
+        if (asepriteBinPath == null) asepriteBinPath = "aseprite";
+        try {
+          childProcess.execSync(`${asepriteBinPath} --version`);
+        } catch {
+          throw new Error(
+            "Cannot find Steam aseprite binary or 'aseprite' on your PATH"
+          );
+        }
         const asepriteArgs = [
           "-b",
           "--sheet",
