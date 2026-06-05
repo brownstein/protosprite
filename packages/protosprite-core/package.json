@@ -17,6 +17,14 @@
     "./transform": {
       "default": "./dist/transform.js",
       "types": "./dist/src/transform/index.d.ts"
+    },
+    "./core/data": {
+      "default": "./dist/src/core/data.js",
+      "types": "./dist/src/core/data.d.ts"
+    },
+    "./core/util": {
+      "default": "./dist/src/core/util.js",
+      "types": "./dist/src/core/util.d.ts"
     }
   },
   "sideEffects": false,
