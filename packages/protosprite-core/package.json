@@ -1,7 +1,7 @@
 {
   "name": "protosprite-core",
   "type": "module",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A compact, protobuf based sprite exchange format",
   "main": "dist/core.js",
   "types": "dist/src/core/index.d.ts",
@@ -12,18 +12,22 @@
     },
     "./importers/aseprite": {
       "default": "./dist/importers/aseprite.js",
+      "import": "./dist/importers/aseprite.js",
       "types": "./dist/src/importers/aseprite.d.ts"
     },
     "./transform": {
       "default": "./dist/transform.js",
+      "import": "./dist/transform.js",
       "types": "./dist/src/transform/index.d.ts"
     },
     "./core/data": {
       "default": "./dist/src/core/data.js",
+      "import": "./dist/src/core/data.js",
       "types": "./dist/src/core/data.d.ts"
     },
     "./core/util": {
       "default": "./dist/src/core/util.js",
+      "import": "./dist/src/core/util.js",
       "types": "./dist/src/core/util.d.ts"
     }
   },
