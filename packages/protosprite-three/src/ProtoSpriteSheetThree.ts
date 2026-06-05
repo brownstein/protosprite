@@ -2,6 +2,10 @@ import { ProtoSpriteInstance, ProtoSpriteSheet } from "protosprite-core";
 import { ShaderMaterial, Texture, Vector2 } from "three";
 
 import { ProtoSpriteThree } from "./ProtoSpriteThree.js";
+import {
+  ProtoSpriteThreeExtended,
+  SliceRegion
+} from "./ProtoSpriteThreeExtended.js";
 import fragmentShader from "./shader.frag";
 import vertexShader from "./shader.vert";
 
@@ -60,6 +64,33 @@ export class ProtoSpriteSheetThree {
     }
     throw new Error(`Sprite ${indexOrName} not found in sheet.`);
   }
+  getSpriteExtended<
+    TLayers extends string | never = string,
+    TAnimations extends string | never = string,
+    TRegions extends string = "main"
+  >(
+    indexOrName?: number | string,
+    regions?: SliceRegion<TRegions>[]
+  ): ProtoSpriteThreeExtended<TLayers, TAnimations, TRegions> {
+    const spriteIndex = this._resolveSpriteIndex(indexOrName);
+    return this._createSpriteExtended(
+      spriteIndex,
+      regions
+    ) as ProtoSpriteThreeExtended<TLayers, TAnimations, TRegions>;
+  }
+  private _resolveSpriteIndex(indexOrName?: number | string): number {
+    if (indexOrName === undefined) return 0;
+    if (typeof indexOrName === "number") return indexOrName;
+    for (
+      let sheetIndex = 0;
+      sheetIndex < this.sheet.sprites.length;
+      sheetIndex++
+    ) {
+      if (this.sheet.sprites[sheetIndex].data.name === indexOrName)
+        return sheetIndex;
+    }
+    throw new Error(`Sprite ${indexOrName} not found in sheet.`);
+  }
   _genMaterials() {
     if (this.materialsGenerated) return;
     this.materialsGenerated = true;
@@ -102,5 +133,22 @@ export class ProtoSpriteSheetThree {
     if (material === undefined)
       throw new Error("Unable to resolve material for sprite.");
     return new ProtoSpriteThree(protoSpriteInstance, material);
+  }
+  private _createSpriteExtended<TRegions extends string = "main">(
+    spriteIndex: number,
+    regions?: SliceRegion<TRegions>[]
+  ) {
+    const sourceSprite = this.sheet.sprites.at(spriteIndex);
+    if (!sourceSprite) throw new Error("Source sprite not found.");
+    const protoSpriteInstance = new ProtoSpriteInstance(sourceSprite);
+    const material =
+      this.individualMaterials?.get(spriteIndex) ?? this.sheetMaterial;
+    if (material === undefined)
+      throw new Error("Unable to resolve material for sprite.");
+    return new ProtoSpriteThreeExtended(
+      protoSpriteInstance,
+      material,
+      regions
+    );
   }
 }

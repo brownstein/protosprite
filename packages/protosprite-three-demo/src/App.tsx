@@ -21,10 +21,12 @@ import {
 import {
   ProtoSpriteSheetThree,
   ProtoSpriteSheetThreeLoader,
-  ProtoSpriteThree
+  ProtoSpriteThree,
+  ProtoSpriteThreeExtended,
+  SliceRegion
 } from "protosprite-three";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box3, Color, Scene } from "three";
+import { Box3, Color, Scene, Vector2 } from "three";
 
 import "./App.css";
 import birdPrsg from "./bird.prsg";
@@ -40,6 +42,44 @@ const theme = createTheme({
     mode: "dark"
   }
 });
+
+/**
+ * Builds a classic 9-slice grid of SliceRegions. The source image (sw x sh) is
+ * carved into a 3x3 grid with a fixed border `inset`; the four corners keep
+ * their native size while the edges and center stretch to fill an `ow` x `oh`
+ * output box. Output coordinates are centered on the origin.
+ */
+function build9SliceRegions(
+  sw: number,
+  sh: number,
+  inset: number,
+  ow: number,
+  oh: number
+): SliceRegion<string>[] {
+  const ix = Math.max(0, Math.min(inset, Math.floor(sw / 2)));
+  const iy = Math.max(0, Math.min(inset, Math.floor(sh / 2)));
+  // Breakpoints along each axis for source and output rects.
+  const sx = [0, ix, sw - ix, sw];
+  const sy = [0, iy, sh - iy, sh];
+  const ox = [0, ix, ow - ix, ow];
+  const oy = [0, iy, oh - iy, oh];
+  const regions: SliceRegion<string>[] = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const srcW = sx[c + 1] - sx[c];
+      const srcH = sy[r + 1] - sy[r];
+      if (srcW <= 0 || srcH <= 0) continue;
+      regions.push({
+        id: `r${r}c${c}`,
+        srcPos: new Vector2(sx[c], sy[r]),
+        srcSize: new Vector2(srcW, srcH),
+        outPos: new Vector2(ox[c] - ow / 2, oy[r] - oh / 2),
+        outSize: new Vector2(ox[c + 1] - ox[c], oy[r + 1] - oy[r])
+      });
+    }
+  }
+  return regions;
+}
 
 function App() {
   const scene = useMemo(() => new Scene(), []);
@@ -68,6 +108,18 @@ function App() {
   >(null);
   const [showGeometry, setShowGeometry] = useState(false);
   const overlaysRef = useRef<GeometryOverlay[]>([]);
+
+  // 9-slice (ProtoSpriteThreeExtended) mode state.
+  const [extendedSprite, setExtendedSprite] = useState<ProtoSpriteThreeExtended<
+    string,
+    string,
+    string
+  > | null>(null);
+  const [sliceTargetWidth, setSliceTargetWidth] = useState(256);
+  const [sliceTargetHeight, setSliceTargetHeight] = useState(256);
+  const [sliceInset, setSliceInset] = useState(10);
+
+  const [currentTab, setCurrentTab] = useState("about");
 
   const iState = useMemo(
     () => ({
@@ -201,15 +253,55 @@ function App() {
 
   useEffect(() => {
     scene.clear();
-    for (const sprite of sprites) scene.add(sprite.mesh);
-    // Re-add overlay meshes if active
-    for (const overlay of overlaysRef.current) {
-      scene.add(overlay.linesMesh);
+    if (currentTab === "nine-slice") {
+      if (extendedSprite) scene.add(extendedSprite.mesh);
+    } else {
+      for (const sprite of sprites) scene.add(sprite.mesh);
+      // Re-add overlay meshes if active
+      for (const overlay of overlaysRef.current) {
+        scene.add(overlay.linesMesh);
+      }
     }
+  }, [scene, sprites, extendedSprite, currentTab]);
+
+  // Dispose the regular sprites whenever they are replaced.
+  useEffect(() => {
     return () => {
       for (const sprite of sprites) sprite.dispose();
     };
-  }, [scene, sprites]);
+  }, [sprites]);
+
+  // Build the extended (9-slice) sprite when the 9-Slice tab is active.
+  useEffect(() => {
+    if (!sheet || currentTab !== "nine-slice") {
+      setExtendedSprite(null);
+      return;
+    }
+    const sprite = sheet.getSpriteExtended<string, string, string>();
+    sprite.gotoAnimation(currentAnimation);
+    sprite.data.animationState.speed = currentPlaybackSpeed;
+    sprite.mesh.scale.y = -1;
+    setExtendedSprite(sprite);
+    return () => {
+      sprite.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet, currentTab]);
+
+  // Rebuild the 9-slice regions whenever the target box or inset changes.
+  useEffect(() => {
+    if (!extendedSprite) return;
+    const { x: sw, y: sh } = extendedSprite.size;
+    extendedSprite.setRegions(
+      build9SliceRegions(
+        sw,
+        sh,
+        sliceInset,
+        sliceTargetWidth,
+        sliceTargetHeight
+      )
+    );
+  }, [extendedSprite, sliceInset, sliceTargetWidth, sliceTargetHeight]);
 
   useEffect(() => {
     // Clean up previous overlays
@@ -268,7 +360,6 @@ function App() {
     return layers;
   }, [sheet]);
 
-  const [currentTab, setCurrentTab] = useState("about");
   const [layersListOpen, setLayersListOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
@@ -279,6 +370,10 @@ function App() {
           <Renderer
             scene={scene}
             onBeforeRender={(delta) => {
+              if (currentTab === "nine-slice") {
+                extendedSprite?.advance(delta);
+                return;
+              }
               for (const sprite of sprites) {
                 sprite.advance(delta);
               }
@@ -294,6 +389,7 @@ function App() {
             >
               <Tab label="About" value="about" />
               <Tab label="Sprite Playground" value="rendering" />
+              <Tab label="9-Slice" value="nine-slice" />
               <Tab label="Import" value="import" />
               <Tab label="Debug" value="debug" />
             </Tabs>
@@ -525,6 +621,74 @@ function App() {
                         />
                       }
                       label="Show Geometry Overlay"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            {currentTab === "nine-slice" && (
+              <div>
+                <h3>
+                  Render the sprite as a warped 9-slice box (
+                  ProtoSpriteThreeExtended).
+                </h3>
+                <p className="explanation small">
+                  The sprite is carved into a 3x3 grid by a fixed border inset.
+                  The corners keep their native size while the edges and center
+                  stretch to fill the target box.
+                </p>
+                <div className="params">
+                  <div className="param odd">
+                    <Typography>Animation</Typography>
+                    <Select
+                      value={currentAnimation}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCurrentAnimation(value);
+                        extendedSprite?.gotoAnimation(value);
+                      }}
+                    >
+                      {animationList.map((animationName) => (
+                        <MenuItem key={animationName} value={animationName}>
+                          {animationName}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="param">
+                    <Typography>Target Width ({sliceTargetWidth}px)</Typography>
+                    <Slider
+                      min={8}
+                      max={512}
+                      step={1}
+                      value={sliceTargetWidth}
+                      onChange={(_e, value) =>
+                        setSliceTargetWidth(value as number)
+                      }
+                    />
+                  </div>
+                  <div className="param odd">
+                    <Typography>
+                      Target Height ({sliceTargetHeight}px)
+                    </Typography>
+                    <Slider
+                      min={8}
+                      max={512}
+                      step={1}
+                      value={sliceTargetHeight}
+                      onChange={(_e, value) =>
+                        setSliceTargetHeight(value as number)
+                      }
+                    />
+                  </div>
+                  <div className="param">
+                    <Typography>Border Inset ({sliceInset}px)</Typography>
+                    <Slider
+                      min={0}
+                      max={64}
+                      step={1}
+                      value={sliceInset}
+                      onChange={(_e, value) => setSliceInset(value as number)}
                     />
                   </div>
                 </div>
