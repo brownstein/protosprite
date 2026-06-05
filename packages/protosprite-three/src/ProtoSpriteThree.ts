@@ -20,7 +20,7 @@ import {
   StringFallback
 } from "./types.js";
 
-type ProtoSpriteThreeLayer = {
+export type ProtoSpriteThreeLayer = {
   geom: BufferGeometry;
   material: ShaderMaterial;
   mesh: Mesh;
@@ -36,7 +36,7 @@ type ProtoSpriteThreeLayer = {
   outlineThicknessArr: Float32Array;
 };
 
-type ProtoSpriteLayerThreeOverride = {
+export type ProtoSpriteLayerThreeOverride = {
   opacity?: number;
   color?: Vector4;
   fade?: Vector4;
