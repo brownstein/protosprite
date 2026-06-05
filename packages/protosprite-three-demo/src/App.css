@@ -84,8 +84,12 @@ h3 {
   text-align: left;
 }
 
-.about .explanation {
+.explanation {
   font-size: 0.8em;
+}
+
+.explanation.small {
+  font-size: 0.5em;
 }
 
 .params {
