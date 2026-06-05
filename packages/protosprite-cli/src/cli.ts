@@ -244,7 +244,7 @@ class ProtoSpriteCLI {
           '--filename-format "({layer}) {frame}"',
           `"${workFileName}"`
         ];
-        childProcess.execSync(`"${asepriteBinPath}" ${asepriteArgs.join(" ")}`);
+        childProcess.execSync(`${asepriteBinPath} ${asepriteArgs.join(" ")}`);
         const sheetData = JSON.parse(
           fs.readFileSync(workExportSheetName, { encoding: "utf8" })
         ) as aseprite.SpriteSheet;
