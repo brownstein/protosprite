@@ -7,10 +7,16 @@ import {
   ProtoSpriteThreeLoaderOpts
 } from "./ProtoSpriteSheetThreeLoader.js";
 import { ProtoSpriteThree } from "./ProtoSpriteThree.js";
+import {
+  ProtoSpriteThreeExtended,
+  SliceRegion
+} from "./ProtoSpriteThreeExtended.js";
 import { ProtoSpriteThreeEventTypes } from "./types.js";
 
 export {
   ProtoSpriteThree,
+  ProtoSpriteThreeExtended,
+  SliceRegion,
   ProtoSpriteThreeEventTypes,
   ProtoSpriteThreeLoaderOpts,
   ProtoSpriteSheetThree,
