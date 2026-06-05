@@ -25,7 +25,7 @@ export type ProtoSpriteThreeLayer = {
   material: ShaderMaterial;
   mesh: Mesh;
 
-  indexArr: Uint16Array;
+  indexArr: Uint16Array | Uint32Array;
   indexArr2: Float32Array;
   posArr: Float32Array;
   uvArr: Float32Array;

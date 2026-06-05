@@ -86,7 +86,7 @@ export class ProtoSpriteThreeExtended<
       geom,
       material,
       mesh,
-      indexArr: new Uint16Array(0),
+      indexArr: new Uint32Array(0),
       indexArr2: new Float32Array(0),
       posArr: new Float32Array(0),
       uvArr: new Float32Array(0),
@@ -140,7 +140,9 @@ export class ProtoSpriteThreeExtended<
     const layerCount = this.protoSpriteInstance.sprite.countLayers();
     const quadCount = layerCount * this.regions.length;
 
-    this.mainLayer.indexArr = new Uint16Array(quadCount * 6);
+    // 32-bit indices: repeat-mode tiling can push the vertex count past the
+    // 65535 ceiling of a 16-bit index buffer.
+    this.mainLayer.indexArr = new Uint32Array(quadCount * 6);
     this.mainLayer.indexArr2 = new Float32Array(quadCount * 4);
     this.mainLayer.posArr = new Float32Array(quadCount * 12);
     this.mainLayer.uvArr = new Float32Array(quadCount * 8);
@@ -446,10 +448,15 @@ export class ProtoSpriteThreeExtended<
       geom.computeBoundingSphere();
       geom.computeBoundingBox();
     } else {
+      // Keep the sphere centered on the actual (near-zero) z of the quads.
+      // Layer z values are small offsets around 0, so the x/y extent dominates
+      // the radius. (Using drawIndex here, as the base class does, would push
+      // the center far down the z axis once many regions inflate drawIndex,
+      // sending the whole mesh outside the camera frustum and culling it.)
       geom.boundingSphere.center.set(
         (xMin + xMax) * 0.5,
         (yMin + yMax) * 0.5,
-        drawIndex * 0.5
+        0
       );
       geom.boundingSphere.radius = Math.max(xMax - xMin, yMax - yMin) * 0.5;
       geom.boundingBox.min.x = xMin;
@@ -991,5 +998,233 @@ export class ProtoSpriteThreeExtended<
 
   get data() {
     return this.protoSpriteInstance;
+  }
+
+  /**
+   * Automatically updates the regions in this sprite to make the final size match
+   * targtWidth x targetHeight, with a fill mode specified as "stretch" to stretch the
+   * regions in a 9-slice to match the result, or "repeat" to create multiple regions to fill
+   * in gaps, tiling the infill.
+   *
+   * The current regions act as the slice template: their source rects define the
+   * grid of columns and rows (and therefore the fixed-corner insets). The outer
+   * column/row on each axis is kept at its native size; the interior bands take
+   * up the remaining target space, either by stretching ("stretch") or by tiling
+   * native-sized copies of the source ("repeat"). Output is centered on the
+   * origin, matching the convention used elsewhere. A grid with a single
+   * column/row (e.g. the default whole-sprite region) has no fixed border, so it
+   * stretches or tiles in full.
+   *
+   * @param targetWidth
+   * @param targetHeight
+   * @param fillMode
+   */
+  autoUpdateRegions(
+    targetWidth: number,
+    targetHeight: number,
+    fillMode: "stretch" | "repeat"
+  ) {
+    if (this.regions.length === 0) return this;
+
+    // Derive the source grid from the current regions' source rects. The union
+    // of all rect edges gives the column / row boundaries.
+    const xEdgeSet = new Set<number>();
+    const yEdgeSet = new Set<number>();
+    for (const region of this.regions) {
+      xEdgeSet.add(region.srcPos.x);
+      xEdgeSet.add(region.srcPos.x + region.srcSize.x);
+      yEdgeSet.add(region.srcPos.y);
+      yEdgeSet.add(region.srcPos.y + region.srcSize.y);
+    }
+    const xEdges = [...xEdgeSet].sort((a, b) => a - b);
+    const yEdges = [...yEdgeSet].sort((a, b) => a - b);
+    if (xEdges.length < 2 || yEdges.length < 2) return this;
+
+    // Cap the fixed-border inset on each axis to at most half the sprite size,
+    // so the two borders can never overlap and starve the stretchable middle.
+    const { x: spriteW, y: spriteH } = this.size;
+    this.clampBorderInset(xEdges, spriteW);
+    this.clampBorderInset(yEdges, spriteH);
+
+    const xLayout = this.computeAxisLayout(xEdges, targetWidth, fillMode);
+    const yLayout = this.computeAxisLayout(yEdges, targetHeight, fillMode);
+
+    // A grid cell is "active" (should be drawn) when its center falls inside at
+    // least one of the existing source regions. This keeps sparse templates
+    // sparse and lets a region that spans several cells subdivide correctly.
+    const cellActive = (cx: number, cy: number) =>
+      this.regions.some(
+        (region) =>
+          cx >= region.srcPos.x &&
+          cx <= region.srcPos.x + region.srcSize.x &&
+          cy >= region.srcPos.y &&
+          cy <= region.srcPos.y + region.srcSize.y
+      );
+
+    const halfW = targetWidth / 2;
+    const halfH = targetHeight / 2;
+    const newRegions: SliceRegion<TRegions>[] = [];
+    let idCounter = 0;
+    for (let c = 0; c < xLayout.length; c++) {
+      const cx = (xEdges[c] + xEdges[c + 1]) * 0.5;
+      for (let r = 0; r < yLayout.length; r++) {
+        const cy = (yEdges[r] + yEdges[r + 1]) * 0.5;
+        if (!cellActive(cx, cy)) continue;
+        // Each cell expands into one region per (column tile x row tile).
+        for (const xSpan of xLayout[c]) {
+          for (const ySpan of yLayout[r]) {
+            newRegions.push({
+              id: `auto-${idCounter++}` as TRegions,
+              srcPos: new Vector2(xSpan.srcStart, ySpan.srcStart),
+              srcSize: new Vector2(xSpan.srcSize, ySpan.srcSize),
+              outPos: new Vector2(
+                xSpan.outStart - halfW,
+                ySpan.outStart - halfH
+              ),
+              outSize: new Vector2(xSpan.outSize, ySpan.outSize)
+            });
+          }
+        }
+      }
+    }
+
+    this.setRegions(newRegions);
+    return this;
+  }
+
+  /**
+   * Lays out one axis of the slice grid. Given the sorted source edges, the
+   * target length, and a fill mode, returns the output sub-spans for each
+   * column (or row). The first and last columns are treated as fixed borders
+   * (kept at native size) when there are at least three columns; the interior
+   * columns absorb the remaining target length, either by stretching to a
+   * proportional share or by tiling native-sized copies of the source. With
+   * fewer than three columns there is no fixed border and every column
+   * stretches / tiles.
+   */
+  private computeAxisLayout(
+    edges: number[],
+    targetLength: number,
+    fillMode: "stretch" | "repeat"
+  ): {
+    srcStart: number;
+    srcSize: number;
+    outStart: number;
+    outSize: number;
+  }[][] {
+    const colCount = edges.length - 1;
+    const cols: { start: number; size: number }[] = [];
+    for (let i = 0; i < colCount; i++) {
+      cols.push({ start: edges[i], size: edges[i + 1] - edges[i] });
+    }
+
+    const hasFixedBorders = colCount >= 3;
+    const isFixed = (i: number) =>
+      hasFixedBorders && (i === 0 || i === colCount - 1);
+
+    let fixedTotal = 0;
+    let stretchSrcTotal = 0;
+    let stretchCount = 0;
+    for (let i = 0; i < colCount; i++) {
+      if (isFixed(i) || cols[i].size <= 0) {
+        if (isFixed(i)) fixedTotal += cols[i].size;
+      } else {
+        stretchSrcTotal += cols[i].size;
+        stretchCount++;
+      }
+    }
+    const available = Math.max(0, targetLength - fixedTotal);
+
+    // Safety cap so a tiny source tiled into a huge target can't explode the
+    // region count.
+    const MAX_TILES = 1024;
+
+    const result: {
+      srcStart: number;
+      srcSize: number;
+      outStart: number;
+      outSize: number;
+    }[][] = [];
+    let outCursor = 0;
+    for (let i = 0; i < colCount; i++) {
+      const col = cols[i];
+      const spans: {
+        srcStart: number;
+        srcSize: number;
+        outStart: number;
+        outSize: number;
+      }[] = [];
+
+      if (isFixed(i) || col.size <= 0) {
+        // Fixed border (or degenerate column): native size, sampled whole.
+        spans.push({
+          srcStart: col.start,
+          srcSize: col.size,
+          outStart: outCursor,
+          outSize: col.size
+        });
+        outCursor += col.size;
+      } else {
+        // Interior column: take a share of the remaining target length.
+        const share =
+          stretchSrcTotal > 0
+            ? (col.size / stretchSrcTotal) * available
+            : available / Math.max(1, stretchCount);
+
+        // Tiling a band that is a single pixel (or less) wide would create a
+        // swarm of degenerate tiles, so fall back to stretching in that case.
+        if (fillMode === "repeat" && col.size > 1) {
+          // Tile native-sized copies of the source, clipping the last one.
+          let filled = 0;
+          let tiles = 0;
+          while (share - filled > 1e-4 && tiles < MAX_TILES) {
+            const tileOut = Math.min(col.size, share - filled);
+            spans.push({
+              srcStart: col.start,
+              srcSize: tileOut, // 1:1 scale, so the partial tail samples a partial source
+              outStart: outCursor + filled,
+              outSize: tileOut
+            });
+            filled += tileOut;
+            tiles++;
+          }
+          outCursor += share;
+        } else {
+          // Stretch: a single span scaled to fill the share.
+          spans.push({
+            srcStart: col.start,
+            srcSize: col.size,
+            outStart: outCursor,
+            outSize: share
+          });
+          outCursor += share;
+        }
+      }
+
+      result.push(spans);
+    }
+
+    return result;
+  }
+
+  /**
+   * Clamps the fixed-border insets of a derived axis grid so neither the
+   * leading nor trailing border exceeds half the sprite size on that axis.
+   * Mutates `edges` in place by pulling the first/last interior boundary
+   * inward, then re-sorts to keep the edges monotonic. A grid with fewer than
+   * three columns has no fixed border and is left untouched.
+   */
+  private clampBorderInset(edges: number[], spriteSize: number) {
+    if (edges.length < 4) return;
+    const maxInset = spriteSize / 2;
+    const last = edges.length - 1;
+    if (edges[1] - edges[0] > maxInset) edges[1] = edges[0] + maxInset;
+    if (edges[last] - edges[last - 1] > maxInset)
+      edges[last - 1] = edges[last] - maxInset;
+    // Keep the interior boundaries monotonic in case both borders collapsed
+    // past one another.
+    for (let i = 1; i < edges.length; i++) {
+      if (edges[i] < edges[i - 1]) edges[i] = edges[i - 1];
+    }
   }
 }

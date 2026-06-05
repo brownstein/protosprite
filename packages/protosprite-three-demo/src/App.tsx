@@ -118,6 +118,9 @@ function App() {
   const [sliceTargetWidth, setSliceTargetWidth] = useState(256);
   const [sliceTargetHeight, setSliceTargetHeight] = useState(256);
   const [sliceInset, setSliceInset] = useState(10);
+  const [sliceFillMode, setSliceFillMode] = useState<"stretch" | "repeat">(
+    "stretch"
+  );
 
   const [currentTab, setCurrentTab] = useState("about");
 
@@ -288,20 +291,26 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet, currentTab]);
 
-  // Rebuild the 9-slice regions whenever the target box or inset changes.
+  // Rebuild the 9-slice regions whenever the target box, inset, or fill mode
+  // changes. We first establish a clean 9-slice source template (only the
+  // source rects matter here), then let autoUpdateRegions recompute the output
+  // layout to fit the target box - stretching or tiling the interior bands.
   useEffect(() => {
     if (!extendedSprite) return;
     const { x: sw, y: sh } = extendedSprite.size;
-    extendedSprite.setRegions(
-      build9SliceRegions(
-        sw,
-        sh,
-        sliceInset,
-        sliceTargetWidth,
-        sliceTargetHeight
-      )
+    extendedSprite.setRegions(build9SliceRegions(sw, sh, sliceInset, sw, sh));
+    extendedSprite.autoUpdateRegions(
+      sliceTargetWidth,
+      sliceTargetHeight,
+      sliceFillMode
     );
-  }, [extendedSprite, sliceInset, sliceTargetWidth, sliceTargetHeight]);
+  }, [
+    extendedSprite,
+    sliceInset,
+    sliceTargetWidth,
+    sliceTargetHeight,
+    sliceFillMode
+  ]);
 
   useEffect(() => {
     // Clean up previous overlays
@@ -690,6 +699,20 @@ function App() {
                       value={sliceInset}
                       onChange={(_e, value) => setSliceInset(value as number)}
                     />
+                  </div>
+                  <div className="param odd">
+                    <Typography>Fill Mode</Typography>
+                    <Select
+                      value={sliceFillMode}
+                      onChange={(e) =>
+                        setSliceFillMode(
+                          e.target.value as "stretch" | "repeat"
+                        )
+                      }
+                    >
+                      <MenuItem value="stretch">stretch</MenuItem>
+                      <MenuItem value="repeat">repeat</MenuItem>
+                    </Select>
                   </div>
                 </div>
               </div>
