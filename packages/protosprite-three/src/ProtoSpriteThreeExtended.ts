@@ -64,6 +64,9 @@ export class ProtoSpriteThreeExtended<
   private offset = new Vector2();
 
   private hiddenLayerNames = new Set<string>();
+  private hiddenGroupNames = new Set<string>();
+  private hiddenLayerNamesExpanded = new Set<string>();
+
   private layerOverrides = new Map<string, ProtoSpriteLayerThreeOverride>();
   private regions: SliceRegion<TRegions>[] = [];
 
@@ -336,22 +339,9 @@ export class ProtoSpriteThreeExtended<
       if (
         layer === undefined ||
         layer.isGroup ||
-        this.hiddenLayerNames.has(layer.name)
+        this.hiddenLayerNamesExpanded.has(layer.name)
       )
         continue;
-      let groupLayerIndex = layer.parentIndex;
-      let groupHidden = false;
-      while (groupLayerIndex !== undefined) {
-        const groupLayer =
-          this.protoSpriteInstance.sprite.data.layers.at(groupLayerIndex);
-        if (groupLayer === undefined) break;
-        if (this.hiddenLayerNames.has(groupLayer.name)) {
-          groupHidden = true;
-          break;
-        }
-        groupLayerIndex = groupLayer.parentIndex;
-      }
-      if (groupHidden) continue;
 
       const { size, sheetPosition, spritePosition } = layerFrame;
       const z = layerIndexToZ.get(layerFrame.layerIndex) ?? 0;
@@ -493,22 +483,9 @@ export class ProtoSpriteThreeExtended<
       if (
         layer === undefined ||
         layer.isGroup ||
-        this.hiddenLayerNames.has(layer.name)
+        this.hiddenLayerNamesExpanded.has(layer.name)
       )
         continue;
-      let groupLayerIndex = layer.parentIndex;
-      let groupHidden = false;
-      while (groupLayerIndex !== undefined) {
-        const groupLayer =
-          this.protoSpriteInstance.sprite.data.layers.at(groupLayerIndex);
-        if (groupLayer === undefined) break;
-        if (this.hiddenLayerNames.has(groupLayer.name)) {
-          groupHidden = true;
-          break;
-        }
-        groupLayerIndex = groupLayer.parentIndex;
-      }
-      if (groupHidden) continue;
 
       const overrides = this.layerOverrides.get(layer.name ?? "*") ?? {};
 
@@ -666,17 +643,43 @@ export class ProtoSpriteThreeExtended<
   }
 
   hideLayers(...layerNames: SafeString<TLayers>[]) {
-    for (const layerName of layerNames) this.hiddenLayerNames.add(layerName);
+    const layerNameMap = this.protoSpriteInstance.sprite.maps.layerNameMap;
+    for (const layerName of layerNames) {
+      if (layerNameMap.get(layerName)?.isGroup) {
+        this.hiddenGroupNames.add(layerName);
+      } else {
+        this.hiddenLayerNames.add(layerName);
+      }
+    }
+    this.recomputeHiddenLayers();
     this.positionDirty = true;
     this.update();
     return this;
   }
 
   showLayers(...layerNames: SafeString<TLayers>[]) {
-    for (const layerName of layerNames) this.hiddenLayerNames.delete(layerName);
+    for (const layerName of layerNames) {
+      this.hiddenLayerNames.delete(layerName);
+      this.hiddenGroupNames.delete(layerName);
+    }
+    this.recomputeHiddenLayers();
     this.positionDirty = true;
     this.update();
     return this;
+  }
+
+  /**
+   * Recomputes the flattened set of hidden layer names. A layer is hidden when
+   * it is directly named in hiddenLayerNames, or when it is a member (at any
+   * depth) of a group named in hiddenGroupNames. Expanding both up front lets
+   * the geometry/extra passes test a single set instead of walking the group
+   * hierarchy per layer.
+   */
+  private recomputeHiddenLayers() {
+    this.hiddenLayerNamesExpanded = this.expandLayerGroups([
+      ...this.hiddenLayerNames,
+      ...this.hiddenGroupNames
+    ]);
   }
 
   center() {
@@ -705,7 +708,7 @@ export class ProtoSpriteThreeExtended<
         layerFrame.layerIndex
       );
       if (layer === undefined) continue;
-      if (this.hiddenLayerNames.has(layer.name ?? "*")) continue;
+      if (this.hiddenLayerNamesExpanded.has(layer.name ?? "*")) continue;
 
       const lx0 = layerFrame.spritePosition.x;
       const ly0 = layerFrame.spritePosition.y;
@@ -999,6 +1002,10 @@ export class ProtoSpriteThreeExtended<
     for (const hiddenLayerName of this.hiddenLayerNames) {
       cloned.hiddenLayerNames.add(hiddenLayerName);
     }
+    for (const hiddenGroupName of this.hiddenGroupNames) {
+      cloned.hiddenGroupNames.add(hiddenGroupName);
+    }
+    cloned.recomputeHiddenLayers();
     for (const [layerName, overrides] of this.layerOverrides) {
       cloned.layerOverrides.set(layerName, {
         ...overrides
@@ -1314,7 +1321,7 @@ export class ProtoSpriteThreeExtended<
           layerFrame.layerIndex
         );
         if (layer === undefined || layer.isGroup) continue;
-        if (this.hiddenLayerNames.has(layer.name ?? "*")) continue;
+        if (this.hiddenLayerNamesExpanded.has(layer.name ?? "*")) continue;
         const lx0 = layerFrame.spritePosition.x;
         const ly0 = layerFrame.spritePosition.y;
         const lx1 = lx0 + layerFrame.size.width;
