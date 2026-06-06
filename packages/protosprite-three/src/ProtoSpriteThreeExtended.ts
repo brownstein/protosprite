@@ -959,6 +959,12 @@ export class ProtoSpriteThreeExtended<
     const currentFrame = this.protoSpriteInstance.animationState.currentFrame;
     const frame = this.protoSpriteInstance.sprite.data.frames.at(currentFrame);
     if (frame === undefined) return bbox;
+    // Mirror updateGeometry: each layer footprint is clipped to every region's
+    // source rect and affine-mapped into that region's output rect (scaling
+    // included). The reported bounds are the union of those mapped output rects
+    // plus the center() offset, so they match the geometry that is actually
+    // drawn rather than the raw sprite-pixel footprints.
+    const v2 = new Vector2();
     for (const frameLayer of frame.layers) {
       const layer = this.protoSpriteInstance.sprite.maps.layerMap.get(
         frameLayer.layerIndex
@@ -969,14 +975,42 @@ export class ProtoSpriteThreeExtended<
         layer.isGroup
       )
         continue;
-      const v2 = new Vector2(
-        offset.x + frameLayer.spritePosition.x,
-        offset.y + frameLayer.spritePosition.y
-      );
-      bbox.expandByPoint(v2);
-      v2.x += frameLayer.size.width - 1;
-      v2.y += frameLayer.size.height - 1;
-      bbox.expandByPoint(v2);
+
+      const lx0 = frameLayer.spritePosition.x;
+      const ly0 = frameLayer.spritePosition.y;
+      const lx1 = lx0 + frameLayer.size.width;
+      const ly1 = ly0 + frameLayer.size.height;
+
+      for (const region of this.regions) {
+        const rsw = region.srcSize.x;
+        const rsh = region.srcSize.y;
+        if (rsw <= 0 || rsh <= 0) continue;
+        const rx0 = region.srcPos.x;
+        const ry0 = region.srcPos.y;
+        const rx1 = rx0 + rsw;
+        const ry1 = ry0 + rsh;
+
+        // Clip the layer footprint against the region source rect.
+        const cx0 = Math.max(lx0, rx0);
+        const cy0 = Math.max(ly0, ry0);
+        const cx1 = Math.min(lx1, rx1);
+        const cy1 = Math.min(ly1, ry1);
+        if (cx1 <= cx0 || cy1 <= cy0) continue;
+
+        // Affine map the clipped piece into the region's output rect.
+        const scaleX = region.outSize.x / rsw;
+        const scaleY = region.outSize.y / rsh;
+        v2.set(
+          offset.x + region.outPos.x + (cx0 - rx0) * scaleX,
+          offset.y + region.outPos.y + (cy0 - ry0) * scaleY
+        );
+        bbox.expandByPoint(v2);
+        v2.set(
+          offset.x + region.outPos.x + (cx1 - rx0) * scaleX,
+          offset.y + region.outPos.y + (cy1 - ry0) * scaleY
+        );
+        bbox.expandByPoint(v2);
+      }
     }
     return bbox;
   }
