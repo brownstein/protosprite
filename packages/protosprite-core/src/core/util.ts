@@ -75,9 +75,9 @@ export class ProtoSpriteDataMap {
 
     for (const layer of this.data.layers) {
       if (layer.isGroup) this.layerGroupSet.add(layer.index);
-      if (layer.parentIndex) {
+      if (layer.parentIndex !== undefined) {
         const parentLayer = this.layerMap.get(layer.parentIndex);
-        if (parentLayer !== undefined) {
+        if (parentLayer?.isGroup) {
           let downGroup = this.layerGroupsDown.get(parentLayer.index);
           if (downGroup === undefined) {
             downGroup = [];
