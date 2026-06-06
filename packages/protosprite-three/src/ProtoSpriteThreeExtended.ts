@@ -44,6 +44,9 @@ export type SliceRegion<T extends string = string> = {
   outSize: Vector2;
 };
 
+// Region IDs for standard 9-slice regions.
+export type NineSliceRegionID = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+
 export class ProtoSpriteThreeExtended<
   TLayers extends string | void = string,
   TAnimations extends string | void = string,
@@ -687,32 +690,59 @@ export class ProtoSpriteThreeExtended<
           (frame + 1) & this.protoSpriteInstance.sprite.data.frames.length;
     }
     if (currFrame === undefined) return false;
-    let xMin = -1;
-    let xMax = -1;
-    let yMin = -1;
-    let yMax = -1;
+    let xMin = Infinity;
+    let xMax = -Infinity;
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    // Centre on what is actually drawn. updateGeometry clips every layer
+    // footprint to each region's source rect and affine-maps the surviving
+    // piece into that region's output rect, so the centred bounds must be the
+    // union of those mapped output rects (not the raw sprite-pixel footprints).
+    // This lets region-sliced sprites centre correctly while regions scale the
+    // output up or down.
     for (const layerFrame of currFrame.layers) {
       const layer = this.protoSpriteInstance.sprite.maps.layerMap.get(
         layerFrame.layerIndex
       );
       if (layer === undefined) continue;
       if (this.hiddenLayerNames.has(layer.name ?? "*")) continue;
-      if (xMin === -1 || xMin > layerFrame.spritePosition.x)
-        xMin = layerFrame.spritePosition.x;
-      if (yMin === -1 || yMin > layerFrame.spritePosition.y)
-        yMin = layerFrame.spritePosition.y;
-      if (
-        xMax === -1 ||
-        xMax < layerFrame.spritePosition.x + layerFrame.size.width - 1
-      )
-        xMax = layerFrame.spritePosition.x + layerFrame.size.width - 1;
-      if (
-        yMax === -1 ||
-        yMax < layerFrame.spritePosition.y + layerFrame.size.height - 1
-      )
-        yMax = layerFrame.spritePosition.y + layerFrame.size.height - 1;
+
+      const lx0 = layerFrame.spritePosition.x;
+      const ly0 = layerFrame.spritePosition.y;
+      const lx1 = lx0 + layerFrame.size.width;
+      const ly1 = ly0 + layerFrame.size.height;
+
+      for (const region of this.regions) {
+        const rsw = region.srcSize.x;
+        const rsh = region.srcSize.y;
+        if (rsw <= 0 || rsh <= 0) continue;
+        const rx0 = region.srcPos.x;
+        const ry0 = region.srcPos.y;
+        const rx1 = rx0 + rsw;
+        const ry1 = ry0 + rsh;
+
+        // Clip the layer footprint against the region source rect.
+        const cx0 = Math.max(lx0, rx0);
+        const cy0 = Math.max(ly0, ry0);
+        const cx1 = Math.min(lx1, rx1);
+        const cy1 = Math.min(ly1, ry1);
+        if (cx1 <= cx0 || cy1 <= cy0) continue;
+
+        // Affine map the clipped piece into the region's output rect.
+        const scaleX = region.outSize.x / rsw;
+        const scaleY = region.outSize.y / rsh;
+        const x0 = region.outPos.x + (cx0 - rx0) * scaleX;
+        const x1 = region.outPos.x + (cx1 - rx0) * scaleX;
+        const y0 = region.outPos.y + (cy0 - ry0) * scaleY;
+        const y1 = region.outPos.y + (cy1 - ry0) * scaleY;
+
+        if (x0 < xMin) xMin = x0;
+        if (x1 > xMax) xMax = x1;
+        if (y0 < yMin) yMin = y0;
+        if (y1 > yMax) yMax = y1;
+      }
     }
-    if (xMin !== -1) {
+    if (xMin !== Infinity) {
       this.offset
         .set(xMin + xMax, yMin + yMax)
         .multiplyScalar(-1 / 2)
@@ -1133,7 +1163,19 @@ export class ProtoSpriteThreeExtended<
         stretchCount++;
       }
     }
-    const available = Math.max(0, targetLength - fixedTotal);
+
+    // The fixed borders normally keep their native size and the interior bands
+    // absorb the slack. But when the target is smaller than the borders alone
+    // (e.g. a 9-slice shrunk below its corners, or after inactive interior
+    // cells were hidden), keeping them native would overflow the target. In
+    // that case scale the borders down proportionally so they fit exactly,
+    // leaving no room for the interior. This lets a region-sliced sprite shrink
+    // below its combined region size instead of overflowing.
+    const borderScale =
+      fixedTotal > targetLength && fixedTotal > 0
+        ? targetLength / fixedTotal
+        : 1;
+    const available = Math.max(0, targetLength - fixedTotal * borderScale);
 
     // Safety cap so a tiny source tiled into a huge target can't explode the
     // region count.
@@ -1156,14 +1198,17 @@ export class ProtoSpriteThreeExtended<
       }[] = [];
 
       if (isFixed(i) || col.size <= 0) {
-        // Fixed border (or degenerate column): native size, sampled whole.
+        // Fixed border (or degenerate column): sampled whole. A fixed border
+        // shrinks by borderScale when the target is too small to hold the
+        // borders at native size; otherwise borderScale is 1 (native size).
+        const outSize = isFixed(i) ? col.size * borderScale : col.size;
         spans.push({
           srcStart: col.start,
           srcSize: col.size,
           outStart: outCursor,
-          outSize: col.size
+          outSize
         });
-        outCursor += col.size;
+        outCursor += outSize;
       } else {
         // Interior column: take a share of the remaining target length.
         const share =
@@ -1226,5 +1271,100 @@ export class ProtoSpriteThreeExtended<
     for (let i = 1; i < edges.length; i++) {
       if (edges[i] < edges[i - 1]) edges[i] = edges[i - 1];
     }
+  }
+
+  /**
+   * Builds a 9-slice region configuration for this sprite.
+   * The sprite is mutated in-place, but also returns itself with the TRegions
+   * set to NineSliceRegionID.
+   *
+   * The two slice points are the corners of the centre cell in sprite-pixel
+   * space, splitting the sprite into a 3x3 grid. Regions are labelled "1".."9"
+   * in row-major order:
+   *
+   *   1 2 3   (top-left, top edge, top-right)
+   *   4 5 6   (left edge, centre, right edge)
+   *   7 8 9   (bottom-left, bottom edge, bottom-right)
+   *
+   * The outer border regions wrap the sprite's real content bounds in native
+   * pixel space (the bounding box of the visible layers), not the nominal
+   * canvas size, so empty canvas margins are excluded from the slices.
+   *
+   * The mapping is identity (output rect == source rect), so the sprite renders
+   * exactly as before until autoUpdateRegions() stretches/tiles it to a target
+   * size, and center() centres on the sliced output.
+   */
+  nineSlice(topLeftSlicePoint: Vector2, bottomRightSlicePoint: Vector2) {
+    const { x: width, y: height } = this.size;
+
+    // Outer grid edges follow the sprite's real content bounds (the bounding
+    // box of the visible layers), falling back to the full canvas when there
+    // is no visible content.
+    let minX = 0;
+    let minY = 0;
+    let maxX = width;
+    let maxY = height;
+    const frame = this.protoSpriteInstance.sprite.data.frames.at(
+      this.protoSpriteInstance.animationState.currentFrame
+    );
+    if (frame !== undefined) {
+      let found = false;
+      for (const layerFrame of frame.layers) {
+        const layer = this.protoSpriteInstance.sprite.maps.layerMap.get(
+          layerFrame.layerIndex
+        );
+        if (layer === undefined || layer.isGroup) continue;
+        if (this.hiddenLayerNames.has(layer.name ?? "*")) continue;
+        const lx0 = layerFrame.spritePosition.x;
+        const ly0 = layerFrame.spritePosition.y;
+        const lx1 = lx0 + layerFrame.size.width;
+        const ly1 = ly0 + layerFrame.size.height;
+        if (!found) {
+          minX = lx0;
+          minY = ly0;
+          maxX = lx1;
+          maxY = ly1;
+          found = true;
+        } else {
+          if (lx0 < minX) minX = lx0;
+          if (ly0 < minY) minY = ly0;
+          if (lx1 > maxX) maxX = lx1;
+          if (ly1 > maxY) maxY = ly1;
+        }
+      }
+    }
+
+    // Column / row edges, clamped to the content bounds and kept monotonic so
+    // the centre cell can't invert or spill past the borders.
+    const x1 = Math.min(Math.max(topLeftSlicePoint.x, minX), maxX);
+    const y1 = Math.min(Math.max(topLeftSlicePoint.y, minY), maxY);
+    const x2 = Math.min(Math.max(bottomRightSlicePoint.x, x1), maxX);
+    const y2 = Math.min(Math.max(bottomRightSlicePoint.y, y1), maxY);
+    const xEdges = [minX, x1, x2, maxX];
+    const yEdges = [minY, y1, y2, maxY];
+
+    const regions: SliceRegion<NineSliceRegionID>[] = [];
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        const sx = xEdges[c];
+        const sy = yEdges[r];
+        const sw = xEdges[c + 1] - xEdges[c];
+        const sh = yEdges[r + 1] - yEdges[r];
+        regions.push({
+          id: `${r * 3 + c + 1}` as NineSliceRegionID,
+          srcPos: new Vector2(sx, sy),
+          srcSize: new Vector2(sw, sh),
+          outPos: new Vector2(sx, sy),
+          outSize: new Vector2(sw, sh)
+        });
+      }
+    }
+
+    this.setRegions(regions as unknown as SliceRegion<TRegions>[]);
+    return this as unknown as ProtoSpriteThreeExtended<
+      TLayers,
+      TAnimations,
+      NineSliceRegionID
+    >;
   }
 }
