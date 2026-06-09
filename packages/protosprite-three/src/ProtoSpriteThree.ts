@@ -403,14 +403,22 @@ export class ProtoSpriteThree<
       );
       if (
         layer === undefined ||
-        layer.isGroup ||
-        this.hiddenLayerNamesExpanded.has(layer.name)
+        layer.isGroup
       )
         continue;
 
       const i = drawIndex++;
       const i4 = i * 4;
       const i16 = i * 16;
+
+      if (this.hiddenLayerNamesExpanded.has(layer.name)) {
+        opacityArr.fill(0, i4, i4 + 4);
+        colorMultArr.fill(0, i16, i16 + 16);
+        colorFadeArr.fill(0, i16, i16 + 16);
+        outlineArr.fill(0, i16, i16 + 16);
+        outlineThicknessArr.fill(0, i4, i4 + 4);
+        continue;
+      }
 
       const overrides = this.layerOverrides.get(layer.name ?? "*") ?? {};
 
