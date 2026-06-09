@@ -290,8 +290,7 @@ export class ProtoSpriteThree<
       );
       if (
         layer === undefined ||
-        layer.isGroup ||
-        this.hiddenLayerNamesExpanded.has(layer.name)
+        layer.isGroup
       )
         continue;
 
@@ -302,6 +301,26 @@ export class ProtoSpriteThree<
       const i = drawIndex++;
       const vi = i * 12;
       const uvi = i * 8;
+
+      if (this.hiddenLayerNamesExpanded.has(layer.name)) {
+        const x0 = 0;
+        const y0 = 0;
+        const x1 = 0;
+        const y1 = 0;
+        posArr[vi + 0] = x0;
+        posArr[vi + 1] = y0;
+        posArr[vi + 2] = z;
+        posArr[vi + 3] = x1;
+        posArr[vi + 4] = y0;
+        posArr[vi + 5] = z;
+        posArr[vi + 6] = x1;
+        posArr[vi + 7] = y1;
+        posArr[vi + 8] = z;
+        posArr[vi + 9] = x0;
+        posArr[vi + 10] = y1;
+        posArr[vi + 11] = z;
+        continue;
+      }
 
       const x0 = ox + spritePosition.x;
       const x1 = x0 + size.width;
