@@ -42,6 +42,7 @@ export type ProtoSpriteLayerThreeOverride = {
   fade?: Vector4;
   outline?: Vector4;
   outlineThickness?: number;
+  offset?: Vector2;
 };
 
 export class ProtoSpriteThree<
@@ -62,7 +63,7 @@ export class ProtoSpriteThree<
   private hiddenLayerNames = new Set<string>();
   private hiddenGroupNames = new Set<string>();
   private hiddenLayerNamesExpanded = new Set<string>();
-  
+
   private layerOverrides = new Map<string, ProtoSpriteLayerThreeOverride>();
 
   constructor(
@@ -288,13 +289,10 @@ export class ProtoSpriteThree<
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
       );
-      if (
-        layer === undefined ||
-        layer.isGroup
-      )
-        continue;
+      if (layer === undefined || layer.isGroup) continue;
 
       const { size, sheetPosition, spritePosition } = layerFrame;
+      const layerOffset = this.layerOverrides.get(layer.name)?.offset;
 
       let z = layerIndexToZ.get(layerFrame.layerIndex) ?? 0;
 
@@ -322,9 +320,9 @@ export class ProtoSpriteThree<
         continue;
       }
 
-      const x0 = ox + spritePosition.x;
+      const x0 = ox + spritePosition.x + (layerOffset?.x ?? 0);
       const x1 = x0 + size.width;
-      const y0 = oy + spritePosition.y;
+      const y0 = oy + spritePosition.y + (layerOffset?.y ?? 0);
       const y1 = y0 + size.height;
 
       if (x0 < xMin) xMin = x0;
@@ -401,11 +399,7 @@ export class ProtoSpriteThree<
       const layer = this.protoSpriteInstance.sprite.data.layers.at(
         layerFrame.layerIndex
       );
-      if (
-        layer === undefined ||
-        layer.isGroup
-      )
-        continue;
+      if (layer === undefined || layer.isGroup) continue;
 
       const i = drawIndex++;
       const i4 = i * 4;
@@ -604,20 +598,15 @@ export class ProtoSpriteThree<
       );
       if (layer === undefined) continue;
       if (this.hiddenLayerNamesExpanded.has(layer.name ?? "*")) continue;
-      if (xMin === -1 || xMin > layerFrame.spritePosition.x)
-        xMin = layerFrame.spritePosition.x;
-      if (yMin === -1 || yMin > layerFrame.spritePosition.y)
-        yMin = layerFrame.spritePosition.y;
-      if (
-        xMax === -1 ||
-        xMax < layerFrame.spritePosition.x + layerFrame.size.width - 1
-      )
-        xMax = layerFrame.spritePosition.x + layerFrame.size.width - 1;
-      if (
-        yMax === -1 ||
-        yMax < layerFrame.spritePosition.y + layerFrame.size.height - 1
-      )
-        yMax = layerFrame.spritePosition.y + layerFrame.size.height - 1;
+      const layerOffset = this.layerOverrides.get(layer.name ?? "*")?.offset;
+      const lxWithOffset = layerFrame.spritePosition.x + (layerOffset?.x ?? 0);
+      const lyWithOffset = layerFrame.spritePosition.y + (layerOffset?.y ?? 0);
+      if (xMin === -1 || xMin > lxWithOffset) xMin = lxWithOffset;
+      if (yMin === -1 || yMin > lyWithOffset) yMin = lyWithOffset;
+      if (xMax === -1 || xMax < lxWithOffset + layerFrame.size.width - 1)
+        xMax = lxWithOffset + layerFrame.size.width - 1;
+      if (yMax === -1 || yMax < lyWithOffset + layerFrame.size.height - 1)
+        yMax = lyWithOffset + layerFrame.size.height - 1;
     }
     if (xMin !== -1) {
       this.offset
@@ -694,6 +683,26 @@ export class ProtoSpriteThree<
       overrides.opacity = opacity;
     }
     this.extraDirty = true;
+    if (doUpdate) this.update();
+    return this;
+  }
+
+  offsetLayers(
+    x: number,
+    y: number,
+    layers: SafeString<TLayers> | SafeStringIterable<TLayers>,
+    doUpdate = true
+  ) {
+    const offset = new Vector2(x, y);
+    for (const layerName of this.expandLayerGroups(layers)) {
+      let overrides = this.layerOverrides.get(layerName);
+      if (overrides === undefined) {
+        overrides = {};
+        this.layerOverrides.set(layerName, overrides);
+      }
+      overrides.offset = offset;
+    }
+    this.positionDirty = true;
     if (doUpdate) this.update();
     return this;
   }
@@ -815,6 +824,7 @@ export class ProtoSpriteThree<
   clearLayerAdjustments() {
     this.layerOverrides.clear();
     this.extraDirty = true;
+    this.positionDirty = true;
     this.update();
     return this;
   }
@@ -843,9 +853,10 @@ export class ProtoSpriteThree<
         layer.isGroup
       )
         continue;
+      const layerOffset = this.layerOverrides.get(layer.name)?.offset;
       const v2 = new Vector2(
-        offset.x + frameLayer.spritePosition.x,
-        offset.y + frameLayer.spritePosition.y
+        offset.x + frameLayer.spritePosition.x + (layerOffset?.x ?? 0),
+        offset.y + frameLayer.spritePosition.y + (layerOffset?.y ?? 0)
       );
       bbox.expandByPoint(v2);
       v2.x += frameLayer.size.width - 1;
