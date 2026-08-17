@@ -9,6 +9,10 @@ import * as Aseprite from "@kayahr/aseprite";
 import cx from "classnames";
 import { Data, Protos } from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
+import {
+  AsepriteFileBitmap,
+  importAsepriteFile
+} from "protosprite-core/importers/aseprite-file";
 import { packSpriteSheet } from "protosprite-core/transform";
 import {
   MouseEventHandler,
@@ -48,10 +52,74 @@ type ProtoSpriteFileToDisplay = {
   imageUrl?: string;
 };
 
+/**
+ * A `.aseprite` file read in the browser. There is no sprite sheet yet — cels
+ * arrive at their own bounds as raw RGBA, and packing is what turns them into
+ * an atlas. The pixels ride along here until then.
+ */
+type AsepriteFileToDisplay = {
+  type: "sprite/aseprite";
+  file: FileWithPath;
+  fileSize: number;
+  sprite: Data.SpriteData;
+  bitmaps: AsepriteFileBitmap[];
+  imageUrl?: string;
+};
+
+/** A file we could not read, kept so the reason can be shown rather than swallowed. */
+type FailedFileToDisplay = {
+  type: "error";
+  file: FileWithPath;
+  fileSize: number;
+  message: string;
+};
+
 type UploadedFile =
   | PngFileToDisplay
   | JsonFileToDisplay
-  | ProtoSpriteFileToDisplay;
+  | ProtoSpriteFileToDisplay
+  | AsepriteFileToDisplay
+  | FailedFileToDisplay;
+
+const ASEPRITE_EXTENSIONS = [".aseprite", ".ase"];
+
+const isAsepriteFileName = (name: string) =>
+  ASEPRITE_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
+
+/**
+ * Composite a sprite's first drawn frame into a thumbnail, straight from the
+ * cel bitmaps. Nothing has been packed at this point, so this is the only way
+ * to show what was dropped.
+ */
+function renderAsepriteThumbnail(
+  sprite: Data.SpriteData,
+  bitmaps: AsepriteFileBitmap[]
+): string | undefined {
+  const frameIndex = bitmaps.length ? bitmaps[0].frameIndex : -1;
+  if (frameIndex < 0) return undefined;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, sprite.size.width);
+  canvas.height = Math.max(1, sprite.size.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return undefined;
+  // Bitmaps are in layer order already, so drawing in sequence stacks them
+  // the way Aseprite does.
+  for (const bitmap of bitmaps) {
+    if (bitmap.frameIndex !== frameIndex) continue;
+    const image = ctx.createImageData(bitmap.width, bitmap.height);
+    image.data.set(bitmap.rgba);
+    // putImageData ignores compositing, so each cel goes through a scratch
+    // canvas to blend against what is already there.
+    const scratch = document.createElement("canvas");
+    scratch.width = bitmap.width;
+    scratch.height = bitmap.height;
+    const scratchCtx = scratch.getContext("2d");
+    if (!scratchCtx) continue;
+    scratchCtx.putImageData(image, 0, 0);
+    ctx.drawImage(scratch, bitmap.x, bitmap.y);
+  }
+  return canvas.toDataURL("image/png");
+}
 
 type ProtoSpriteResult = {
   type: "sprite/protosprite";
@@ -69,7 +137,8 @@ export function Converter(props: ConverterProps) {
     accept: {
       "image/png": [".png"],
       "application/json": [".json"],
-      "sprite/protosprite": [".prs"]
+      "sprite/protosprite": [".prs"],
+      "sprite/aseprite": ASEPRITE_EXTENSIONS
     },
     onDropAccepted(files) {
       setAllFiles((currentFiles) => [
@@ -103,6 +172,7 @@ export function Converter(props: ConverterProps) {
     // a resulting sprite sheet.
     const availablePngsByName = new Map<string, PngFileToDisplay>();
     const availableSprites: Aseprite.SpriteSheet[] = [];
+    const availableAsepriteFiles: AsepriteFileToDisplay[] = [];
     let resultSheet = new Data.SpriteSheetData();
     for (const processed of processIState.allProcessedFiles) {
       switch (processed.type) {
@@ -112,10 +182,37 @@ export function Converter(props: ConverterProps) {
         case "image/png":
           availablePngsByName.set(processed.file.name, processed);
           break;
+        case "sprite/aseprite":
+          availableAsepriteFiles.push(processed);
+          break;
         case "sprite/protosprite":
           resultSheet = processed.spriteSheetData.clone();
           break;
+        case "error":
+          break;
       }
+    }
+    // Sprites read straight from .aseprite carry their pixels with them rather
+    // than pointing at a sheet, so packing is told where to find them.
+    const bitmapsBySpriteIndex = new Map<
+      number,
+      Map<string, AsepriteFileBitmap>
+    >();
+    for (const asepriteFile of availableAsepriteFiles) {
+      const sprite = asepriteFile.sprite.clone();
+      if (!sprite.name) {
+        sprite.name = asepriteFile.file.name.replace(/\.(aseprite|ase)$/i, "");
+      }
+      bitmapsBySpriteIndex.set(
+        resultSheet.sprites.length,
+        new Map(
+          asepriteFile.bitmaps.map((bitmap) => [
+            `${bitmap.frameIndex}:${bitmap.layerIndex}`,
+            bitmap
+          ])
+        )
+      );
+      resultSheet.sprites.push(sprite);
     }
     for (const spriteJson of availableSprites) {
       const pngFileName = spriteJson.meta.image;
@@ -135,7 +232,12 @@ export function Converter(props: ConverterProps) {
       setProcessing(false);
       return;
     }
-    const packed = (await packSpriteSheet(resultSheet)) as Data.SpriteSheetData;
+    const packed = (await packSpriteSheet(resultSheet, {
+      tiles: (spriteIndex, frameIndex, frameLayer) =>
+        bitmapsBySpriteIndex
+          .get(spriteIndex)
+          ?.get(`${frameIndex}:${frameLayer.layerIndex}`)
+    })) as Data.SpriteSheetData;
     const packedProto = packed.toProto();
     const packedArray = toBinary(Protos.SpriteSheetSchema, packedProto);
     let imageUrl: string | undefined;
@@ -231,7 +333,8 @@ export function Converter(props: ConverterProps) {
           </div>
         )}
         <div className="upload-text">
-          <div>Upload Sprites(s):</div>
+          <div>Upload Sprite(s):</div>
+          <div>.aseprite</div>
           <div>.png + .json</div>
           <div>or .prs</div>
         </div>
@@ -334,8 +437,44 @@ function DisplayFile(props: DisplayFileProps) {
       iState.processed = true;
     };
 
+    /**
+     * Read a `.aseprite` file in the browser: no Aseprite install, no server,
+     * the file never leaves the page.
+     */
+    const processAsepriteFile = async () => {
+      const buff = await iState.file.arrayBuffer();
+      try {
+        const { sprite, bitmaps } = importAsepriteFile(new Uint8Array(buff), {
+          spriteName: iState.file.name.replace(/\.(aseprite|ase)$/i, "")
+        });
+        setProcessedFile({
+          type: "sprite/aseprite",
+          file: iState.file,
+          fileSize: iState.file.size,
+          sprite,
+          bitmaps,
+          imageUrl: renderAsepriteThumbnail(sprite, bitmaps)
+        });
+      } catch (err) {
+        // Tilemap layers and damaged files raise named errors. Showing the
+        // reason beats a tile that silently never finishes loading.
+        setProcessedFile({
+          type: "error",
+          file: iState.file,
+          fileSize: iState.file.size,
+          message: err instanceof Error ? err.message : String(err)
+        });
+      }
+      iState.processed = true;
+    };
+
     if (iState.file.name.endsWith(".prs")) {
       processProtoSprite();
+      return;
+    }
+
+    if (isAsepriteFileName(iState.file.name)) {
+      processAsepriteFile();
       return;
     }
 
@@ -367,10 +506,30 @@ function DisplayFile(props: DisplayFileProps) {
       case "sprite/protosprite":
         content = <img src={processedFile.imageUrl} alt="sprite sheet"/>;
         break;
+      case "sprite/aseprite":
+        content = <img src={processedFile.imageUrl} alt="aseprite sprite" />;
+        break;
+      case "error":
+        content = <div className="file-error">{processedFile.message}</div>;
+        break;
     }
   } else {
     content = <div>( Uploading )</div>;
   }
+
+  const plural = (count: number, noun: string) =>
+    `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+  // What was read out of the file, for .aseprite input. Its own row rather
+  // than an overlay, so it cannot land on top of the type and size bars.
+  const detail =
+    processedFile?.type === "sprite/aseprite"
+      ? [
+          plural(processedFile.sprite.frames.length, "frame"),
+          plural(processedFile.sprite.layers.length, "layer"),
+          plural(processedFile.sprite.animations.length, "tag")
+        ].join(", ")
+      : null;
 
   useEffect(() => {
     if (processedFile) onProcessed?.(processedFile);
@@ -394,6 +553,7 @@ function DisplayFile(props: DisplayFileProps) {
     <div className="display-file" onClick={onClickCapture}>
       <div className="file-name">{file.name}</div>
       <div className="preview">{content}</div>
+      {detail && <div className="file-detail">{detail}</div>}
       {processedFile?.type && (
         <div className="file-type">{processedFile.type}</div>
       )}

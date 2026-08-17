@@ -719,9 +719,15 @@ function App() {
             )}
             {currentTab === "import" && (
               <div>
-                <h3>
-                  Preview your own files (Aseprite exports or ProtoSprite)
-                </h3>
+                <h3>Preview your own files</h3>
+                <p className="explanation small">
+                  Drop a <code>.aseprite</code> file to convert and render it
+                  here. It is read, packed into an atlas and encoded in the
+                  page — no Aseprite install, no upload, nothing leaves your
+                  machine. Aseprite JSON exports (<code>.png</code> +{" "}
+                  <code>.json</code>) and existing <code>.prs</code> sheets work
+                  too.
+                </p>
                 <Converter
                   onPreviewSprite={async (sheet) => {
                     const spriteSheet = new ProtoSpriteSheet(sheet);
@@ -729,6 +735,15 @@ function App() {
                       await loader.loadAsync(spriteSheet);
                     setGeometryData(null);
                     setSheet(spriteSheetThree);
+                    // The animation selector is still holding a name from
+                    // whatever was loaded before — "Fly" on a fresh page —
+                    // which almost never exists in a sprite someone just
+                    // dropped, leaving it parked on a single frame. Move to
+                    // something this sheet actually has.
+                    const firstAnimation = sheet.sprites
+                      .flatMap((sprite) => sprite.animations)
+                      .at(0)?.name;
+                    if (firstAnimation) setCurrentAnimation(firstAnimation);
                   }}
                 />
               </div>
