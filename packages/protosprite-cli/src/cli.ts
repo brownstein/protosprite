@@ -4,7 +4,6 @@ import * as aseprite from "@kayahr/aseprite";
 import childProcess from "child_process";
 import fs from "fs";
 import { Jimp } from "jimp";
-import os from "os";
 import path from "path";
 import ProtoSprite, {
   ProtoSpriteInstance,
@@ -12,26 +11,32 @@ import ProtoSprite, {
 } from "protosprite-core";
 import { importAsepriteSheetExport } from "protosprite-core/importers/aseprite";
 import {
+  AsepriteFileBitmap,
+  importAsepriteFile
+} from "protosprite-core/importers/aseprite-file";
+import {
   packSpriteSheet,
   renderSpriteInstance
 } from "protosprite-core/transform";
-import {
-  ProtoSpriteGeometry,
-  Vec2Data
-} from "protosprite-geom";
+import { ProtoSpriteGeometry, Vec2Data } from "protosprite-geom";
 import { traceSpriteSheet } from "protosprite-geom/trace";
 import tmpDir from "temp-dir";
 
 import {
   ExternalSpriteSheetData,
+  SpriteData,
   isEmbeddedSpriteSheetData,
   isExternalSpriteSheetData
 } from "../../protosprite-core/dist/src/core/data.js";
+import { compressPng } from "./util/compressPng.js";
+import {
+  ASEPRITE_BIN_ENV,
+  isRunnable,
+  resolveAsepriteBinary
+} from "./util/findAseprite.js";
+import { genTypeDefinitions } from "./util/genDefinitions.js";
 
 type RenderedImage = Awaited<ReturnType<typeof renderSpriteInstance>>;
-import { compressPng } from "./util/compressPng.js";
-import { findSteamAsepriteBinary } from "./util/findAseprite.js";
-import { genTypeDefinitions } from "./util/genDefinitions.js";
 
 function drawLine(
   image: RenderedImage,
@@ -137,6 +142,7 @@ type ProtoSpriteCLIArgs = {
   overlayPolygons?: boolean;
   compress?: boolean;
   compressionLevel?: number;
+  useAsepriteBinary?: boolean;
 };
 
 class ProtoSpriteCLI {
@@ -144,12 +150,20 @@ class ProtoSpriteCLI {
   private sheet?: ProtoSpriteSheet;
   private geometry?: ProtoSpriteGeometry;
   private workingDirectory = path.join(tmpDir, "protosprite");
+  private workingDirectoryReady = false;
+  /**
+   * Pixels for sprites read straight from `.aseprite`. Those sprites have no
+   * pixel source to decode — the cels are here — so packing takes them from
+   * this rather than from disk.
+   */
+  private asepriteBitmaps = new Map<
+    SpriteData,
+    Map<string, AsepriteFileBitmap>
+  >();
   constructor(args: ProtoSpriteCLIArgs) {
     this.args = args;
   }
   async _process() {
-    if (this.args.debug)
-      console.log("[debug] working directory:", this.workingDirectory);
     if (this.args.debug) console.log("[debug] loading files...");
     await this._loadFiles();
     if (this.args.debug)
@@ -173,12 +187,6 @@ class ProtoSpriteCLI {
   }
   private async _loadFiles() {
     this.sheet = new ProtoSpriteSheet();
-    // Clear out working directory.
-    fs.rmSync(this.workingDirectory, {
-      recursive: true,
-      force: true
-    });
-    fs.mkdirSync(this.workingDirectory);
     // Process files.
     for (const inputFile of this.args.inputFiles) {
       const inputFileParts = path.parse(inputFile);
@@ -194,71 +202,14 @@ class ProtoSpriteCLI {
         continue;
       }
 
-      // Handle aseprite files exports automatically.
+      // Handle aseprite files.
       if (
         inputFileParts.ext.endsWith("ase") ||
         inputFileParts.ext.endsWith("aseprite")
       ) {
-        const workFileName = path.join(
-          this.workingDirectory,
-          inputFileParts.base
-        );
-        fs.copyFileSync(inputFile, workFileName);
-        const workExportSheetName = path.join(
-          this.workingDirectory,
-          `${inputFileParts.name}.json`
-        );
-        const workExportPngName = path.join(
-          this.workingDirectory,
-          `${inputFileParts.name}.png`
-        );
-        let asepriteBinPath = findSteamAsepriteBinary();
-        // Replace spaces in binary path with escapes.
-        if (os.platform() === "darwin") {
-          asepriteBinPath = asepriteBinPath?.replaceAll(" ", "\\ ") ?? null;
-        }
-        if (asepriteBinPath == null) asepriteBinPath = "aseprite";
-        try {
-          childProcess.execSync(`${asepriteBinPath} --version`);
-        } catch {
-          throw new Error(
-            "Cannot find Steam aseprite binary or 'aseprite' on your PATH"
-          );
-        }
-        const asepriteArgs = [
-          "-b",
-          "--sheet",
-          `"${workExportPngName}"`,
-          "--data",
-          `"${workExportSheetName}"`,
-          "--format json-hash",
-          "--split-layers",
-          "--all-layers",
-          "--list-layers",
-          "--list-tags",
-          "--ignore-empty",
-          "--merge-duplicates",
-          "--border-padding 1",
-          "--shape-padding 1",
-          "--trim",
-          '--filename-format "({layer}) {frame}"',
-          `"${workFileName}"`
-        ];
-        childProcess.execSync(`${asepriteBinPath} ${asepriteArgs.join(" ")}`);
-        const sheetData = JSON.parse(
-          fs.readFileSync(workExportSheetName, { encoding: "utf8" })
-        ) as aseprite.SpriteSheet;
-        if (this.args.debug)
-          console.log(
-            "File to import:",
-            this.workingDirectory + path.sep + sheetData.meta.image
-          );
-        const sprite = importAsepriteSheetExport(sheetData, {
-          referenceType: "file",
-          frameNameFormat: "({layer}) {frame}",
-          assetPath: this.workingDirectory + path.sep,
-          debug: this.args.debug
-        });
+        const sprite = this.args.useAsepriteBinary
+          ? this._loadAsepriteViaBinary(inputFile)
+          : this._loadAsepriteDirectly(inputFile);
         if (this.args.debug) console.log("Imported file:", sprite.name);
         this.sheet?.data.sprites.push(sprite);
         this.sheet?.sprites.push(new ProtoSprite(sprite, this.sheet));
@@ -269,6 +220,158 @@ class ProtoSpriteCLI {
       const rawBuff = fs.readFileSync(inputFile);
       this.sheet = ProtoSpriteSheet.fromArray(new Uint8Array(rawBuff));
     }
+  }
+
+  /**
+   * Read a `.aseprite` file directly. The default: no Aseprite install, no
+   * child process, no temp directory. Cels come back as raw pixels, which are
+   * held here until packing.
+   */
+  private _loadAsepriteDirectly(inputFile: string) {
+    const bytes = new Uint8Array(fs.readFileSync(inputFile));
+    let imported;
+    try {
+      imported = importAsepriteFile(bytes);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `${reason}\n\nReading ${path.basename(inputFile)} directly failed. ` +
+          "If the file uses something this reader does not cover, " +
+          "--use-aseprite-binary exports it through Aseprite instead."
+      );
+    }
+    // Keyed by the sprite object rather than an index: sprites are pushed in
+    // input order here, but reordering later must not silently repaint them.
+    this.asepriteBitmaps.set(
+      imported.sprite,
+      new Map(
+        imported.bitmaps.map((bitmap) => [
+          `${bitmap.frameIndex}:${bitmap.layerIndex}`,
+          bitmap
+        ])
+      )
+    );
+    if (this.args.debug) {
+      console.log(
+        `[debug] read ${path.basename(inputFile)} directly: ` +
+          `${imported.sprite.frames.length} frames, ` +
+          `${imported.sprite.layers.length} layers, ` +
+          `${imported.bitmaps.length} cels`
+      );
+    }
+    return imported.sprite;
+  }
+
+  /**
+   * Export through the Aseprite binary and import its JSON, the way this tool
+   * has always worked. Kept for art the direct reader cannot handle and for
+   * anyone who wants Aseprite's own exporter to be the source of truth.
+   */
+  private _loadAsepriteViaBinary(inputFile: string) {
+    const inputFileParts = path.parse(inputFile);
+    const workingDirectory = this._prepareWorkingDirectory();
+    const workFileName = path.join(workingDirectory, inputFileParts.base);
+    fs.copyFileSync(inputFile, workFileName);
+    const workExportSheetName = path.join(
+      workingDirectory,
+      `${inputFileParts.name}.json`
+    );
+    const workExportPngName = path.join(
+      workingDirectory,
+      `${inputFileParts.name}.png`
+    );
+
+    const asepriteBinPath = resolveAsepriteBinary();
+    if (asepriteBinPath === null) {
+      throw new Error(
+        "--use-aseprite-binary was given, but no Aseprite binary was found.\n" +
+          `Set ${ASEPRITE_BIN_ENV} to its path, install it where Steam puts ` +
+          "it, or put 'aseprite' on your PATH.\n" +
+          "Dropping the flag reads the file directly and needs none of that."
+      );
+    }
+    if (!isRunnable(asepriteBinPath)) {
+      throw new Error(
+        `Aseprite binary at "${asepriteBinPath}" would not run.` +
+          (process.env[ASEPRITE_BIN_ENV]
+            ? ` It came from ${ASEPRITE_BIN_ENV}.`
+            : "")
+      );
+    }
+    if (this.args.debug)
+      console.log("[debug] aseprite binary:", asepriteBinPath);
+
+    // execFileSync, not execSync: the binary path and the file names are not
+    // ours, and a shell would treat spaces and quotes in them as syntax.
+    childProcess.execFileSync(asepriteBinPath, [
+      "-b",
+      "--sheet",
+      workExportPngName,
+      "--data",
+      workExportSheetName,
+      "--format",
+      "json-hash",
+      "--split-layers",
+      "--all-layers",
+      "--list-layers",
+      "--list-tags",
+      "--ignore-empty",
+      "--merge-duplicates",
+      "--border-padding",
+      "1",
+      "--shape-padding",
+      "1",
+      "--trim",
+      "--filename-format",
+      "({layer}) {frame}",
+      workFileName
+    ]);
+
+    const sheetData = JSON.parse(
+      fs.readFileSync(workExportSheetName, { encoding: "utf8" })
+    ) as aseprite.SpriteSheet;
+    if (this.args.debug)
+      console.log(
+        "File to import:",
+        workingDirectory + path.sep + sheetData.meta.image
+      );
+    return importAsepriteSheetExport(sheetData, {
+      referenceType: "file",
+      frameNameFormat: "({layer}) {frame}",
+      assetPath: workingDirectory + path.sep,
+      debug: this.args.debug
+    });
+  }
+
+  /**
+   * Hand packing the pixels of a sprite that was read straight from
+   * `.aseprite`. Undefined for every other sprite, which sends packing back to
+   * decoding that sprite's own pixel source — so one sheet can mix the two.
+   */
+  private _resolveAsepriteTile = (
+    spriteIndex: number,
+    frameIndex: number,
+    frameLayer: { layerIndex: number }
+  ) => {
+    const sprite = this.sheet?.data.sprites[spriteIndex];
+    if (sprite === undefined) return undefined;
+    return this.asepriteBitmaps
+      .get(sprite)
+      ?.get(`${frameIndex}:${frameLayer.layerIndex}`);
+  };
+
+  /**
+   * Create the scratch directory the binary path exports into. Only that path
+   * needs one, so it is made on demand rather than on every run.
+   */
+  private _prepareWorkingDirectory() {
+    if (this.workingDirectoryReady) return this.workingDirectory;
+    fs.rmSync(this.workingDirectory, { recursive: true, force: true });
+    fs.mkdirSync(this.workingDirectory, { recursive: true });
+    this.workingDirectoryReady = true;
+    if (this.args.debug)
+      console.log("[debug] working directory:", this.workingDirectory);
+    return this.workingDirectory;
   }
   private async _saveFiles() {
     if (!this.sheet) return;
@@ -281,7 +384,9 @@ class ProtoSpriteCLI {
       this.args.outputGeomJsonFileName
     ) {
       if (this.args.debug) console.log("Packing sprite sheet...", this.sheet);
-      this.sheet.data = await packSpriteSheet(this.sheet.data);
+      this.sheet.data = await packSpriteSheet(this.sheet.data, {
+        tiles: this._resolveAsepriteTile
+      });
       this.sheet.sprites = this.sheet.data.sprites.map(
         (data) => new ProtoSprite(data, this.sheet)
       );
@@ -378,7 +483,8 @@ class ProtoSpriteCLI {
       if (this.args.outputGeomJsonFileName) {
         // Trace if we don't already have geometry from --output-prsg or input.
         if (!this.geometry) {
-          if (this.args.debug) console.log("[debug] tracing geometry for JSON output...");
+          if (this.args.debug)
+            console.log("[debug] tracing geometry for JSON output...");
           const geomData = await traceSpriteSheet(this.sheet, {
             tolerance: this.args.simplifyTolerance ?? 1.0,
             composite: this.args.compositeGeometry ?? false
@@ -444,10 +550,7 @@ class ProtoSpriteCLI {
     }
   }
 
-  private async _writeFramePng(
-    frameImg: RenderedImage,
-    outPath: string
-  ) {
+  private async _writeFramePng(frameImg: RenderedImage, outPath: string) {
     if (this.args.compress) {
       // Write uncompressed version with _uncompressed suffix.
       const parsed = path.parse(outPath);
@@ -489,11 +592,7 @@ class ProtoSpriteCLI {
       // If sprite has animations, export frames per animation.
       if (sprite.data.animations.length > 0) {
         for (const animation of sprite.data.animations) {
-          for (
-            let i = animation.indexStart;
-            i <= animation.indexEnd;
-            i++
-          ) {
+          for (let i = animation.indexStart; i <= animation.indexEnd; i++) {
             const instance = new ProtoSpriteInstance(sprite);
             instance.animationState.currentFrame = i;
 
@@ -537,8 +636,7 @@ class ProtoSpriteCLI {
           const outPath = path.join(this.args.exportFramesDir, fileName);
           await this._writeFramePng(frameImg, outPath);
 
-          if (this.args.debug)
-            console.log("[debug] exported frame:", outPath);
+          if (this.args.debug) console.log("[debug] exported frame:", outPath);
         }
       }
     }
@@ -553,9 +651,21 @@ function formatBytes(bytes: number): string {
 
 function describePixelSource(
   pixelSource:
-    | { _isEmbeddedData?: boolean; pngData?: Uint8Array; _isExternalData?: boolean; url?: string; fileName?: string }
+    | {
+        _isEmbeddedData?: boolean;
+        pngData?: Uint8Array;
+        _isExternalData?: boolean;
+        url?: string;
+        fileName?: string;
+      }
     | undefined
-): { description: string; type: string; size?: number; fileName?: string; url?: string } {
+): {
+  description: string;
+  type: string;
+  size?: number;
+  fileName?: string;
+  url?: string;
+} {
   if (!pixelSource) {
     return { description: "none", type: "none" };
   }
@@ -563,9 +673,10 @@ function describePixelSource(
     const embedded = pixelSource as { pngData?: Uint8Array };
     const size = embedded.pngData?.byteLength;
     return {
-      description: size != null
-        ? `embedded PNG (${formatBytes(size)} bytes)`
-        : "embedded PNG",
+      description:
+        size != null
+          ? `embedded PNG (${formatBytes(size)} bytes)`
+          : "embedded PNG",
       type: "embedded",
       size
     };
@@ -679,7 +790,13 @@ function analyzePrs(
 }
 
 function printLayerTree(
-  layers: Array<{ name: string; index: number; isGroup: boolean; parentIndex?: number; opacity?: number }>,
+  layers: Array<{
+    name: string;
+    index: number;
+    isGroup: boolean;
+    parentIndex?: number;
+    opacity?: number;
+  }>,
   indent: string
 ) {
   // Build children map.
@@ -696,7 +813,8 @@ function printLayerTree(
       let label = layer.name;
       const annotations: string[] = [];
       if (layer.isGroup) annotations.push("group");
-      if (layer.opacity != null && layer.opacity !== 0) annotations.push(`opacity: ${layer.opacity}`);
+      if (layer.opacity != null && layer.opacity !== 0)
+        annotations.push(`opacity: ${layer.opacity}`);
       if (annotations.length > 0) label += ` (${annotations.join(", ")})`;
       console.log(`${prefix}- ${label}`);
       if (layer.isGroup) {
@@ -712,25 +830,38 @@ function printLayerTree(
   // But some layers may have parentIndex = 0. Let's check if we already printed them.
 }
 
-function printPrsAnalysis(result: ReturnType<typeof analyzePrs>, opts?: { frameDurations?: boolean }) {
+function printPrsAnalysis(
+  result: ReturnType<typeof analyzePrs>,
+  opts?: { frameDurations?: boolean }
+) {
   console.log(`File: ${result.file} (${formatBytes(result.fileSize)} bytes)`);
   console.log(`  Pixel source: ${result.pixelSource.description}`);
 
   for (const sprite of result.sprites) {
     console.log();
-    console.log(`  Sprite: "${sprite.name}" (${sprite.size.width}x${sprite.size.height})`);
-    console.log(`    Frames: ${sprite.frameCount} (total duration: ${sprite.totalDuration}ms)`);
+    console.log(
+      `  Sprite: "${sprite.name}" (${sprite.size.width}x${sprite.size.height})`
+    );
+    console.log(
+      `    Frames: ${sprite.frameCount} (total duration: ${sprite.totalDuration}ms)`
+    );
 
     if (opts?.frameDurations && sprite.frameDurations) {
-      console.log(`    Frame durations: ${sprite.frameDurations.map((f) => f.duration).join(", ")}`);
+      console.log(
+        `    Frame durations: ${sprite.frameDurations.map((f) => f.duration).join(", ")}`
+      );
     }
 
     if (sprite.animations.length > 0) {
       console.log(`    Animations:`);
       for (const anim of sprite.animations) {
-        console.log(`      - ${anim.name} (frames ${anim.indexStart}-${anim.indexEnd}, ${anim.duration}ms)`);
+        console.log(
+          `      - ${anim.name} (frames ${anim.indexStart}-${anim.indexEnd}, ${anim.duration}ms)`
+        );
         if (opts?.frameDurations && anim.frameDurations) {
-          console.log(`        Frame durations: ${anim.frameDurations.map((f) => f.duration).join(", ")}`);
+          console.log(
+            `        Frame durations: ${anim.frameDurations.map((f) => f.duration).join(", ")}`
+          );
         }
       }
     }
@@ -742,9 +873,19 @@ function printPrsAnalysis(result: ReturnType<typeof analyzePrs>, opts?: { frameD
   }
 }
 
-function analyzePrsg(filePath: string, fileSize: number, geom: ProtoSpriteGeometry) {
+function analyzePrsg(
+  filePath: string,
+  fileSize: number,
+  geom: ProtoSpriteGeometry
+) {
   // Describe the sprite source.
-  let spriteSourceInfo: { description: string; type: string; fileName?: string; url?: string; prsSize?: number };
+  let spriteSourceInfo: {
+    description: string;
+    type: string;
+    fileName?: string;
+    url?: string;
+    prsSize?: number;
+  };
   const src = geom.data.spriteSource;
   if (!src) {
     spriteSourceInfo = { description: "none", type: "none" };
@@ -837,15 +978,23 @@ function printPrsgAnalysis(result: ReturnType<typeof analyzePrsg>) {
 
   // Print embedded PRS sprite info if available.
   if (result.prsAnalysis) {
-    console.log(`  Pixel source: ${result.prsAnalysis.pixelSource.description}`);
+    console.log(
+      `  Pixel source: ${result.prsAnalysis.pixelSource.description}`
+    );
     for (const sprite of result.prsAnalysis.sprites) {
       console.log();
-      console.log(`  Sprite: "${sprite.name}" (${sprite.size.width}x${sprite.size.height})`);
-      console.log(`    Frames: ${sprite.frameCount} (total duration: ${sprite.totalDuration}ms)`);
+      console.log(
+        `  Sprite: "${sprite.name}" (${sprite.size.width}x${sprite.size.height})`
+      );
+      console.log(
+        `    Frames: ${sprite.frameCount} (total duration: ${sprite.totalDuration}ms)`
+      );
       if (sprite.animations.length > 0) {
         console.log(`    Animations:`);
         for (const anim of sprite.animations) {
-          console.log(`      - ${anim.name} (frames ${anim.indexStart}-${anim.indexEnd}, ${anim.duration}ms)`);
+          console.log(
+            `      - ${anim.name} (frames ${anim.indexStart}-${anim.indexEnd}, ${anim.duration}ms)`
+          );
         }
       }
       if (sprite.layers.length > 0) {
@@ -858,10 +1007,16 @@ function printPrsgAnalysis(result: ReturnType<typeof analyzePrsg>) {
   console.log();
   console.log(`  Geometry entries: ${result.entries.length}`);
   for (const entry of result.entries) {
-    console.log(`    Entry: "${entry.spriteName}" (simplify tolerance: ${entry.simplifyTolerance})`);
+    console.log(
+      `    Entry: "${entry.spriteName}" (simplify tolerance: ${entry.simplifyTolerance})`
+    );
     console.log(`      Frames with geometry: ${entry.frameCount}`);
-    console.log(`      Has per-layer geometry: ${entry.hasPerLayerGeometry ? "yes" : "no"}`);
-    console.log(`      Has composite geometry: ${entry.hasCompositeGeometry ? "yes" : "no"}`);
+    console.log(
+      `      Has per-layer geometry: ${entry.hasPerLayerGeometry ? "yes" : "no"}`
+    );
+    console.log(
+      `      Has composite geometry: ${entry.hasCompositeGeometry ? "yes" : "no"}`
+    );
     console.log(`      Unique shapes: ${entry.uniqueShapes}`);
     console.log(`      Total shape references: ${entry.totalShapeReferences}`);
     console.log(`      Unique vertices: ${entry.uniqueVertices}`);
@@ -909,10 +1064,7 @@ program
     "--output-geom-json [file]",
     "output traced geometry as a human-readable JSON file."
   )
-  .option(
-    "--prsg-embed-prs",
-    "embed the .prs data inside the .prsg file."
-  )
+  .option("--prsg-embed-prs", "embed the .prs data inside the .prsg file.")
   .option(
     "--export-frames [dir]",
     "export each frame of each animation as a separate PNG."
@@ -926,9 +1078,10 @@ program
     "set PNG compression level (max colors, 2-256). enabled by default.",
     "256"
   )
+  .option("--uncompressed", "disable PNG compression.")
   .option(
-    "--uncompressed",
-    "disable PNG compression."
+    "--use-aseprite-binary",
+    `export .aseprite input through the Aseprite binary instead of reading it directly. Needs Aseprite installed; set ${ASEPRITE_BIN_ENV} to choose which binary.`
   )
   .action(async (opts) => {
     let args: ProtoSpriteCLIArgs = {
@@ -971,6 +1124,7 @@ program
       args.compress = true;
       args.compressionLevel = parseInt(opts.compression, 10);
     }
+    if (opts.useAsepriteBinary) args.useAsepriteBinary = true;
 
     const cli = new ProtoSpriteCLI(args);
     await cli._process();
@@ -1141,9 +1295,7 @@ program
     // Re-pack sprite sheet if structural changes were made.
     if (needsRepack) {
       sheet.data = await packSpriteSheet(sheet.data);
-      sheet.sprites = sheet.data.sprites.map(
-        (d) => new ProtoSprite(d, sheet)
-      );
+      sheet.sprites = sheet.data.sprites.map((d) => new ProtoSprite(d, sheet));
     }
 
     // Compress embedded PNG if requested.
@@ -1194,7 +1346,10 @@ program
       frameDurations: !!opts.frameDurations,
       animation: opts.animation as string | undefined
     };
-    const results: (ReturnType<typeof analyzePrs> | ReturnType<typeof analyzePrsg>)[] = [];
+    const results: (
+      | ReturnType<typeof analyzePrs>
+      | ReturnType<typeof analyzePrsg>
+    )[] = [];
 
     for (const inputFile of inputFiles) {
       const fileParts = path.parse(inputFile);

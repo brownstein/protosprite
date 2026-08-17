@@ -15,10 +15,20 @@
       "import": "./dist/importers/aseprite.js",
       "types": "./dist/src/importers/aseprite.d.ts"
     },
+    "./importers/aseprite-file": {
+      "default": "./dist/importers/aseprite-file.js",
+      "import": "./dist/importers/aseprite-file.js",
+      "types": "./dist/src/importers/aseprite-file.d.ts"
+    },
     "./transform": {
       "default": "./dist/transform.js",
       "import": "./dist/transform.js",
       "types": "./dist/src/transform/index.d.ts"
+    },
+    "./transform/raw": {
+      "default": "./dist/transform/raw.js",
+      "import": "./dist/transform/raw.js",
+      "types": "./dist/src/transform/raw.d.ts"
     },
     "./core/data": {
       "default": "./dist/src/core/data.js",
@@ -64,6 +74,7 @@
     "bin-pack": "^1.0.2",
     "buffer": "^6.0.3",
     "events": "^3.3.0",
+    "fflate": "^0.8.3",
     "jimp": "^1.6.0",
     "js-base64": "^3.7.8",
     "tslib": "^2.8.1",
