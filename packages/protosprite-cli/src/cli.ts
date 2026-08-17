@@ -1026,10 +1026,32 @@ function printPrsgAnalysis(result: ReturnType<typeof analyzePrsg>) {
 
 // --- Command setup ---
 
+/**
+ * This tool's own version, read from its package.json rather than written out
+ * here, where it sat at "0.0.1" through ten releases. Callers use `--version`
+ * to check which build they have — a consumer pinning cli and core together
+ * has been bitten by a version skew before — so a wrong answer is worse than
+ * no answer.
+ *
+ * Resolved relative to this module: `dist/cli.js` sits one level below the
+ * package root, and npm always ships package.json regardless of `files`.
+ */
+function readOwnVersion(): string {
+  try {
+    const packageJsonUrl = new URL("../package.json", import.meta.url);
+    const raw = fs.readFileSync(packageJsonUrl, { encoding: "utf8" });
+    const version = JSON.parse(raw).version;
+    if (typeof version === "string" && version.length > 0) return version;
+  } catch {
+    // Fall through: not knowing the version is not a reason to refuse to run.
+  }
+  return "unknown";
+}
+
 const program = new Command()
   .name("protosprite-cli")
   .description("Utilities for working with protosprite")
-  .version("0.0.1");
+  .version(readOwnVersion());
 
 program
   .command("build")
